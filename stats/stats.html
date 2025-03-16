@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Blog Tracker - Stats</title>
+  <link rel="stylesheet" type="text/css" href="stats.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Blog Reading Stats</h1>
+    
+    <div class="stats-summary">
+      <div class="stat-card">
+        <h3>Total Blogs Read</h3>
+        <p id="total-blogs">0</p>
+      </div>
+      <div class="stat-card">
+        <h3>Unique Authors</h3>
+        <p id="unique-authors">0</p>
+      </div>
+      <div class="stat-card">
+        <h3>Unique Websites</h3>
+        <p id="unique-websites">0</p>
+      </div>
+      <div class="stat-card">
+        <h3>Average Rating</h3>
+        <p id="average-rating">0.0</p>
+      </div>
+    </div>
+
+    <div class="activity-graph">
+      <h2>Reading Activity</h2>
+      <div id="activity-graph-container"></div>
+    </div>
+    
+    <div class="entries-section">
+      <h2>Reading History</h2>
+      <div class="filter-controls">
+        <input type="text" id="search-input" placeholder="Search by title, author, or website...">
+        <select id="sort-select">
+          <option value="date-desc">Most Recent</option>
+          <option value="date-asc">Oldest First</option>
+          <option value="rating-desc">Highest Rating</option>
+          <option value="rating-asc">Lowest Rating</option>
+        </select>
+      </div>
+      <div id="entries-list"></div>
+    </div>
+  </div>
+  <script src="stats.js"></script>
+</body>
+</html>

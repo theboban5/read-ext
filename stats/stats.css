@@ -1,0 +1,177 @@
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f9f9f9;
+  }
+  
+  .container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+  
+  h1 {
+    text-align: center;
+    color: #333;
+    margin-bottom: 30px;
+  }
+  
+  h2 {
+    color: #444;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 10px;
+    margin-top: 30px;
+  }
+  
+  .stats-summary {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+  }
+  
+  .stat-card {
+    background-color: white;
+    border-radius: 8px;
+    padding: 15px;
+    width: 22%;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    text-align: center;
+  }
+  
+  .stat-card h3 {
+    margin-top: 0;
+    color: #666;
+    font-size: 14px;
+  }
+  
+  .stat-card p {
+    font-size: 28px;
+    font-weight: bold;
+    color: #4285f4;
+    margin: 10px 0 0;
+  }
+  
+  .activity-graph {
+    background-color: white;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 30px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  }
+  
+  #activity-graph-container {
+    height: 180px;
+    margin-top: 20px;
+  }
+  
+  .day-cell {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    margin: 2px;
+    background-color: #eee;
+    border-radius: 2px;
+  }
+  
+  .day-cell-level-1 { background-color: #c6e48b; }
+  .day-cell-level-2 { background-color: #7bc96f; }
+  .day-cell-level-3 { background-color: #239a3b; }
+  .day-cell-level-4 { background-color: #196127; }
+  
+  .entries-section {
+    background-color: white;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  }
+  
+  .filter-controls {
+    display: flex;
+    margin-bottom: 20px;
+  }
+  
+  #search-input {
+    flex-grow: 1;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-right: 10px;
+  }
+  
+  #sort-select {
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    min-width: 150px;
+  }
+  
+  #entries-list {
+    max-height: 500px;
+    overflow-y: auto;
+  }
+  
+  .entry-card {
+    border-bottom: 1px solid #eee;
+    padding: 15px 0;
+  }
+  
+  .entry-card:last-child {
+    border-bottom: none;
+  }
+  
+  .entry-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 5px;
+  }
+  
+  .entry-title {
+    font-weight: bold;
+    color: #1a73e8;
+    text-decoration: none;
+    font-size: 16px;
+  }
+  
+  .entry-title:hover {
+    text-decoration: underline;
+  }
+  
+  .entry-rating {
+    color: #ffd700;
+    font-size: 16px;
+  }
+  
+  .entry-info {
+    color: #666;
+    font-size: 13px;
+  }
+  
+  .entry-date {
+    color: #999;
+    font-size: 12px;
+    margin-top: 5px;
+  }
+  
+  @media (max-width: 768px) {
+    .stat-card {
+      width: calc(50% - 10px);
+      margin-bottom: 20px;
+    }
+    
+    .filter-controls {
+      flex-direction: column;
+    }
+    
+    #search-input {
+      margin-right: 0;
+      margin-bottom: 10px;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .stat-card {
+      width: 100%;
+    }
+  }
