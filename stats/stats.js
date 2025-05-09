@@ -63,8 +63,8 @@ document.addEventListener('DOMContentLoaded', function() {
       
       // Update DOM
       totalBlogsElement.textContent = totalBlogs;
-      uniqueAuthorsElement.textContent = uniqueAuthors.size;
-      uniqueWebsitesElement.textContent = uniqueWebsites.size;
+      document.getElementById('unique-authors').textContent = uniqueAuthors.size;
+      document.getElementById('unique-websites').textContent = uniqueWebsites.size;
       averageRatingElement.textContent = avgRating.toFixed(1);
     }
     
@@ -319,4 +319,93 @@ document.addEventListener('DOMContentLoaded', function() {
       const options = { year: 'numeric', month: 'short', day: 'numeric' };
       return date.toLocaleDateString('en-US', options);
     }
+    
+    // Modal logic for authors and websites
+    function showModal(type, items, blogsByKey) {
+      const modal = document.getElementById(type === 'authors' ? 'authors-modal' : 'websites-modal');
+      modal.innerHTML = `
+        <div class="modal-content">
+          <button class="modal-close" aria-label="Close">&times;</button>
+          <h2>${type === 'authors' ? 'Authors' : 'Websites'}</h2>
+          <div class="toggle-list">
+            ${items.map(item => {
+              const blogs = (blogsByKey[item.name] || []).slice().sort((a, b) => (b.rating || 0) - (a.rating || 0));
+              // Calculate average rating
+              let avgRating = 0;
+              if (blogs.length > 0) {
+                const sum = blogs.reduce((acc, b) => acc + (b.rating || 0), 0);
+                avgRating = sum / blogs.length;
+              }
+              // Half-star logic
+              function renderStars(rating) {
+                const fullStars = Math.floor(rating);
+                const halfStar = rating - fullStars >= 0.25 && rating - fullStars < 0.75 ? 1 : 0;
+                const emptyStars = 5 - fullStars - halfStar;
+                return '★'.repeat(fullStars) + (halfStar ? '⯨' : '') + '☆'.repeat(emptyStars);
+              }
+              let avgStars = avgRating ? `<span class='toggle-rating' title='Average rating'>${renderStars(avgRating)}</span>` : '';
+              return `
+                <details>
+                  <summary>${item.name} <span style='color:#888;font-size:13px;'>(${item.count})</span> ${avgStars}</summary>
+                  <ul class='toggle-blogs'>
+                    ${blogs.map(blog => {
+                      let rating = blog.rating ? `<span class='toggle-rating'>${'★'.repeat(blog.rating)}${'☆'.repeat(5 - blog.rating)}</span>` : '';
+                      let url = blog.url || '#';
+                      let title = blog.title || 'Untitled';
+                      return `<li><a href='${url}' class='toggle-link' target='_blank' rel='noopener'>${title}</a> ${rating}</li>`;
+                    }).join('')}
+                  </ul>
+                </details>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
+      modal.style.display = 'flex';
+      // Close logic
+      modal.querySelector('.modal-close').onclick = () => { modal.style.display = 'none'; };
+      modal.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
+    }
+
+    document.getElementById('show-authors').onclick = function(e) {
+      e.preventDefault();
+      chrome.runtime.sendMessage({action: 'getBlogEntries'}, function(response) {
+        const blogEntries = response.blogEntries || [];
+        const authorCounts = {};
+        const blogsByAuthor = {};
+        blogEntries.forEach(entry => {
+          if (entry.author && entry.author.trim() !== '') {
+            const key = entry.author.trim();
+            authorCounts[key] = (authorCounts[key] || 0) + 1;
+            if (!blogsByAuthor[key]) blogsByAuthor[key] = [];
+            blogsByAuthor[key].push(entry);
+          }
+        });
+        const sortedAuthors = Object.entries(authorCounts)
+          .map(([name, count]) => ({name, count}))
+          .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+        showModal('authors', sortedAuthors, blogsByAuthor);
+      });
+    };
+
+    document.getElementById('show-websites').onclick = function(e) {
+      e.preventDefault();
+      chrome.runtime.sendMessage({action: 'getBlogEntries'}, function(response) {
+        const blogEntries = response.blogEntries || [];
+        const websiteCounts = {};
+        const blogsByWebsite = {};
+        blogEntries.forEach(entry => {
+          if (entry.website && entry.website.trim() !== '') {
+            const key = entry.website.trim();
+            websiteCounts[key] = (websiteCounts[key] || 0) + 1;
+            if (!blogsByWebsite[key]) blogsByWebsite[key] = [];
+            blogsByWebsite[key].push(entry);
+          }
+        });
+        const sortedWebsites = Object.entries(websiteCounts)
+          .map(([name, count]) => ({name, count}))
+          .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+        showModal('websites', sortedWebsites, blogsByWebsite);
+      });
+    };
   });

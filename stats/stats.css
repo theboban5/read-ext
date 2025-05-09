@@ -201,6 +201,8 @@ body {
     padding-left: 18px;
     margin: 0;
     margin-bottom: 0;
+    max-height: 160px;
+    overflow-y: auto;
   }
   .custom-tooltip .tooltip-list li {
     margin-bottom: 4px;
@@ -226,6 +228,112 @@ body {
     font-size: 13px;
   }
   .custom-tooltip .tooltip-rating {
+    color: #ffd700;
+    font-size: 13px;
+    margin-left: 6px;
+    letter-spacing: 1px;
+    vertical-align: middle;
+  }
+  
+  .modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0,0,0,0.25);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-content {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.18);
+    padding: 32px 28px 24px 28px;
+    min-width: 320px;
+    max-width: 90vw;
+    max-height: 80vh;
+    overflow-y: auto;
+    position: relative;
+  }
+  .modal-content h2 {
+    margin-top: 0;
+    font-size: 22px;
+    margin-bottom: 18px;
+  }
+  .modal-content ul {
+    padding-left: 20px;
+    margin: 0;
+  }
+  .modal-content li {
+    margin-bottom: 7px;
+    font-size: 16px;
+  }
+  .modal-close {
+    position: absolute;
+    top: 10px;
+    right: 16px;
+    font-size: 22px;
+    color: #888;
+    cursor: pointer;
+    background: none;
+    border: none;
+  }
+  .modal-close:hover {
+    color: #222;
+  }
+  
+  .stat-number {
+    display: block;
+    font-size: 28px;
+    font-weight: bold;
+    color: #4285f4;
+    margin: 10px 0 0;
+    text-decoration: none;
+    cursor: pointer;
+    text-align: center;
+  }
+  .stat-number:focus {
+    outline: none;
+  }
+  
+  .toggle-list details {
+    margin-bottom: 10px;
+    border-radius: 5px;
+    background: #f7f7fa;
+    padding: 0 0 0 8px;
+    transition: background 0.2s;
+  }
+  .toggle-list summary {
+    font-size: 17px;
+    font-weight: 500;
+    cursor: pointer;
+    outline: none;
+    padding: 10px 0 10px 0;
+    list-style: none;
+  }
+  .toggle-list details[open] {
+    background: #f0f4fa;
+  }
+  .toggle-blogs {
+    margin: 0 0 10px 0;
+    padding-left: 20px;
+  }
+  .toggle-blogs li {
+    margin-bottom: 5px;
+    font-size: 15px;
+  }
+  .toggle-link {
+    color: #1a73e8;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  .toggle-link:hover {
+    color: #174ea6;
+  }
+  .toggle-rating {
     color: #ffd700;
     font-size: 13px;
     margin-left: 6px;
