@@ -76,19 +76,23 @@ document.addEventListener('DOMContentLoaded', function() {
       
       // Create a map for counting blog entries by date
       const entriesByDate = new Map();
+      // Create a map for storing blog entries by date
+      const blogsByDate = new Map();
       
-      // Initialize with empty counts
+      // Initialize with empty counts and empty arrays
       for (let d = new Date(oneYearAgo); d <= today; d.setDate(d.getDate() + 1)) {
         const dateStr = formatDate(d);
         entriesByDate.set(dateStr, 0);
+        blogsByDate.set(dateStr, []);
       }
       
-      // Count entries by date
+      // Count entries by date and collect blogs
       blogEntries.forEach(entry => {
         const entryDate = new Date(entry.date);
         if (entryDate >= oneYearAgo && entryDate <= today) {
           const dateStr = formatDate(entryDate);
           entriesByDate.set(dateStr, (entriesByDate.get(dateStr) || 0) + 1);
+          blogsByDate.get(dateStr).push(entry);
         }
       });
       
@@ -146,21 +150,61 @@ document.addEventListener('DOMContentLoaded', function() {
       for (let d = new Date(oneYearAgo); d <= today; d.setDate(d.getDate() + 1)) {
         const dateStr = formatDate(d);
         const count = entriesByDate.get(dateStr) || 0;
+        const blogs = blogsByDate.get(dateStr) || [];
         
         const dayCell = document.createElement('div');
         dayCell.className = 'day-cell';
+        dayCell.dataset.date = dateStr;
         
         // Add level class based on count
         if (count > 0) {
           const level = Math.min(Math.ceil(count * 4 / maxCount), 4);
           dayCell.classList.add(`day-cell-level-${level}`);
-          
-          // Add tooltip
-          dayCell.title = `${dateStr}: ${count} blog(s)`;
-        } else {
-          dayCell.title = dateStr + ": 0 blogs";
         }
         
+        // Custom tooltip logic
+        dayCell.addEventListener('mouseenter', function(e) {
+          let tooltip = document.createElement('div');
+          tooltip.className = 'custom-tooltip';
+          tooltip.style.left = (e.clientX + 10) + 'px';
+          tooltip.style.top = (e.clientY + 10) + 'px';
+          tooltip.innerHTML = `<div class='tooltip-date'>${dateStr}</div>`;
+          if (blogs.length > 0) {
+            tooltip.innerHTML += `<ul class='tooltip-list'>` + blogs.map((entry, idx) => {
+              let title = entry.title || 'Untitled';
+              let author = entry.author ? ` <span class='tooltip-author'>&mdash; ${entry.author}</span>` : '';
+              let rating = entry.rating ? `<span class='tooltip-rating'>${'★'.repeat(entry.rating)}${'☆'.repeat(5 - entry.rating)}</span>` : '';
+              let url = entry.url || '#';
+              return `<li><a href='${url}' class='tooltip-link' target='_blank' rel='noopener'>${title}</a>${author} ${rating}</li>`;
+            }).join('') + `</ul>`;
+          } else {
+            tooltip.innerHTML += `<div class='tooltip-empty'>No blogs</div>`;
+          }
+          document.body.appendChild(tooltip);
+          dayCell._tooltip = tooltip;
+
+          // Tooltip hover logic
+          let hideTimeout;
+          const removeTooltip = () => {
+            if (tooltip.parentNode) tooltip.parentNode.removeChild(tooltip);
+            dayCell._tooltip = null;
+          };
+          dayCell._hideTooltip = () => {
+            hideTimeout = setTimeout(removeTooltip, 100);
+          };
+          dayCell._clearHideTooltip = () => {
+            if (hideTimeout) clearTimeout(hideTimeout);
+          };
+          dayCell.addEventListener('mouseleave', dayCell._hideTooltip);
+          tooltip.addEventListener('mouseenter', dayCell._clearHideTooltip);
+          tooltip.addEventListener('mouseleave', dayCell._hideTooltip);
+        });
+        dayCell.addEventListener('mousemove', function(e) {
+          if (dayCell._tooltip) {
+            dayCell._tooltip.style.left = (e.clientX + 10) + 'px';
+            dayCell._tooltip.style.top = (e.clientY + 10) + 'px';
+          }
+        });
         graphDiv.appendChild(dayCell);
       }
       
