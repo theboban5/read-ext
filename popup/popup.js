@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const readLaterBtn = document.getElementById('read-later-btn');
     const messageDiv = document.getElementById('message');
     const stars = document.querySelectorAll('.star');
+    const randomizer = document.getElementById('randomizer');
   
     // Get current tab's URL
     chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
@@ -144,6 +145,33 @@ document.addEventListener('DOMContentLoaded', function() {
               window.close();
             }, 1500);
           });
+        }
+      });
+    });
+  
+    // Randomizer functionality
+    randomizer.addEventListener('click', function(e) {
+      e.preventDefault();
+      
+      // Get the read later list
+      chrome.storage.local.get('toReadEntries', function(data) {
+        const toReadEntries = data.toReadEntries || [];
+        
+        if (toReadEntries.length === 0) {
+          showMessage('No articles in your read later list!', 'info');
+          return;
+        }
+        
+        // Select a random article
+        const randomIndex = Math.floor(Math.random() * toReadEntries.length);
+        const randomArticle = toReadEntries[randomIndex];
+        
+        // Open the article in a new tab
+        if (randomArticle && randomArticle.url) {
+          chrome.tabs.create({url: randomArticle.url});
+          window.close();
+        } else {
+          showMessage('Error finding article', 'error');
         }
       });
     });

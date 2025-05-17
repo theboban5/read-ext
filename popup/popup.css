@@ -113,7 +113,7 @@ body {
     font-size: 13px;
     display: flex;
     justify-content: center;
-    gap: 20px;
+    gap: 15px;
   }
   
   .footer a {
@@ -122,5 +122,13 @@ body {
   }
   
   .footer a:hover {
+    text-decoration: underline;
+  }
+  
+  #randomizer {
+    color: #fbbc04;
+  }
+  
+  #randomizer:hover {
     text-decoration: underline;
   }
