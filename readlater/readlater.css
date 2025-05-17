@@ -1,0 +1,164 @@
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  margin: 0;
+  padding: 0;
+  background-color: #f9f9f9;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+h1 {
+  text-align: center;
+  color: #333;
+  margin-bottom: 30px;
+}
+
+.controls-section {
+  background-color: white;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.filter-controls {
+  display: flex;
+  margin-bottom: 10px;
+}
+
+#search-input {
+  flex-grow: 1;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  margin-right: 10px;
+}
+
+#sort-select {
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  min-width: 150px;
+}
+
+.entries-section {
+  background-color: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+#entries-list {
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.entry-card {
+  border-bottom: 1px solid #eee;
+  padding: 15px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.entry-card:last-child {
+  border-bottom: none;
+}
+
+.entry-content {
+  flex: 1;
+}
+
+.entry-title {
+  font-weight: bold;
+  color: #1a73e8;
+  text-decoration: none;
+  font-size: 16px;
+  display: block;
+  margin-bottom: 5px;
+}
+
+.entry-title:hover {
+  text-decoration: underline;
+}
+
+.entry-info {
+  color: #666;
+  font-size: 13px;
+}
+
+.entry-date {
+  color: #999;
+  font-size: 12px;
+  margin-top: 5px;
+}
+
+.entry-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.action-btn {
+  padding: 6px 10px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  color: white;
+}
+
+.read-btn {
+  background-color: #4285f4;
+}
+
+.read-btn:hover {
+  background-color: #3367d6;
+}
+
+.visit-btn {
+  background-color: #34a853;
+}
+
+.visit-btn:hover {
+  background-color: #2d9249;
+}
+
+.remove-btn {
+  background-color: #ea4335;
+}
+
+.remove-btn:hover {
+  background-color: #d33426;
+}
+
+.footer {
+  text-align: center;
+  margin-top: 20px;
+  padding-top: 15px;
+  border-top: 1px solid #eee;
+}
+
+.footer a {
+  color: #4285f4;
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.footer a:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 768px) {
+  .filter-controls {
+    flex-direction: column;
+  }
+  
+  #search-input {
+    margin-right: 0;
+    margin-bottom: 10px;
+  }
+} 

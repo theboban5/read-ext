@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const websiteInput = document.getElementById('website');
     const ratingInput = document.getElementById('rating');
     const saveBtn = document.getElementById('save-btn');
+    const readLaterBtn = document.getElementById('read-later-btn');
     const messageDiv = document.getElementById('message');
     const stars = document.querySelectorAll('.star');
   
@@ -104,6 +105,46 @@ document.addEventListener('DOMContentLoaded', function() {
             window.close();
           }, 1500);
         });
+      });
+    });
+  
+    // Read Later button click handler
+    readLaterBtn.addEventListener('click', function() {
+      const toReadEntry = {
+        url: urlInput.value,
+        title: titleInput.value,
+        author: authorInput.value,
+        website: websiteInput.value,
+        date: new Date().toISOString()
+      };
+      
+      if (!toReadEntry.url) {
+        showMessage('URL is required', 'error');
+        return;
+      }
+      
+      // Save to Chrome storage
+      chrome.storage.local.get('toReadEntries', function(data) {
+        const toReadEntries = data.toReadEntries || [];
+        
+        // Check if URL already exists in to-read list
+        const existingIndex = toReadEntries.findIndex(entry => entry.url === toReadEntry.url);
+        
+        if (existingIndex !== -1) {
+          // URL already in read-later list
+          showMessage('Already in your read-later list!', 'info');
+        } else {
+          // Add new entry
+          toReadEntries.push(toReadEntry);
+          showMessage('Added to read later!', 'success');
+          
+          // Save to storage
+          chrome.storage.local.set({toReadEntries: toReadEntries}, function() {
+            setTimeout(function() {
+              window.close();
+            }, 1500);
+          });
+        }
       });
     });
   

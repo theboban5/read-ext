@@ -340,3 +340,20 @@ body {
     letter-spacing: 1px;
     vertical-align: middle;
   }
+
+  .footer {
+    text-align: center;
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid #eee;
+  }
+
+  .footer a {
+    color: #4285f4;
+    text-decoration: none;
+    font-size: 14px;
+  }
+
+  .footer a:hover {
+    text-decoration: underline;
+  }

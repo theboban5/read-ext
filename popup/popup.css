@@ -52,6 +52,17 @@ body {
     color: #ffd700;
   }
   
+  .button-group {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+  }
+  
+  .button-group button {
+    flex: 1;
+    margin-top: 0;
+  }
+  
   button {
     display: block;
     width: 100%;
@@ -63,6 +74,14 @@ body {
     cursor: pointer;
     font-size: 14px;
     margin-top: 15px;
+  }
+  
+  #read-later-btn {
+    background-color: #34a853;
+  }
+  
+  #read-later-btn:hover {
+    background-color: #2d9249;
   }
   
   button:hover {
@@ -84,10 +103,17 @@ body {
     color: red;
   }
   
+  .info {
+    color: #4285f4;
+  }
+  
   .footer {
     text-align: center;
     margin-top: 15px;
     font-size: 13px;
+    display: flex;
+    justify-content: center;
+    gap: 20px;
   }
   
   .footer a {

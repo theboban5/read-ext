@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Read Later List</title>
+  <link rel="stylesheet" type="text/css" href="readlater.css">
+  <meta charset="UTF-8">
+</head>
+<body>
+  <div class="container">
+    <h1>to read</h1>
+    
+    <div class="controls-section">
+      <div class="filter-controls">
+        <input type="text" id="search-input" placeholder="Search by title, author, or website...">
+        <select id="sort-select">
+          <option value="date-desc">Most Recent</option>
+          <option value="date-asc">Oldest First</option>
+          <option value="website">By Website</option>
+        </select>
+      </div>
+    </div>
+    
+    <div class="entries-section">
+      <div id="entries-list"></div>
+    </div>
+
+    <div class="footer">
+      <a href="../stats/stats.html">View Stats</a>
+    </div>
+  </div>
+  
+  <script src="readlater.js"></script>
+</body>
+</html> 
