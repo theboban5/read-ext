@@ -9,6 +9,17 @@
   <div class="container">
     <h1>to read</h1>
     
+    <div class="stats-summary">
+      <div class="stat-card">
+        <h3>Total</h3>
+        <p id="total-blogs">0</p>
+      </div>
+      <div class="stat-card">
+        <h3>Unique Websites</h3>
+        <a href="#" id="show-websites" class="stat-number"><span id="unique-websites">0</span></a>
+      </div>
+    </div>
+    
     <div class="controls-section">
       <div class="filter-controls">
         <input type="text" id="search-input" placeholder="Search by title, author, or website...">
@@ -29,6 +40,7 @@
     </div>
   </div>
   
+  <div id="websites-modal" class="modal" style="display:none;"></div>
   <script src="readlater.js"></script>
 </body>
 </html> 

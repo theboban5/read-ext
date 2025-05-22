@@ -3,6 +3,8 @@ document.addEventListener('DOMContentLoaded', function() {
   const entriesListElement = document.getElementById('entries-list');
   const searchInput = document.getElementById('search-input');
   const sortSelect = document.getElementById('sort-select');
+  const totalBlogsElement = document.getElementById('total-blogs');
+  const uniqueWebsitesElement = document.getElementById('unique-websites');
   
   // Load read later entries
   loadToReadEntries();
@@ -10,6 +12,9 @@ document.addEventListener('DOMContentLoaded', function() {
   // Add event listeners for filtering and sorting
   searchInput.addEventListener('input', updateEntriesList);
   sortSelect.addEventListener('change', updateEntriesList);
+  
+  // Add event listener for stats modal
+  document.getElementById('show-websites').addEventListener('click', showWebsitesModal);
   
   function loadToReadEntries() {
     chrome.runtime.sendMessage({action: 'getToReadEntries'}, function(response) {
@@ -20,9 +25,84 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
       }
       
+      // Update stats summary
+      updateStatsSummary(toReadEntries);
+      
       // Initialize entries list
       updateEntriesList();
     });
+  }
+  
+  function updateStatsSummary(toReadEntries) {
+    const totalBlogs = toReadEntries.length;
+    
+    // Get unique websites
+    const uniqueWebsites = new Set();
+    toReadEntries.forEach(entry => {
+      if (entry.website && entry.website.trim() !== '') {
+        uniqueWebsites.add(entry.website.trim().toLowerCase());
+      }
+    });
+    
+    // Update DOM
+    totalBlogsElement.textContent = totalBlogs;
+    uniqueWebsitesElement.textContent = uniqueWebsites.size;
+  }
+  
+  function showWebsitesModal(e) {
+    e.preventDefault();
+    chrome.runtime.sendMessage({action: 'getToReadEntries'}, function(response) {
+      const toReadEntries = response.toReadEntries || [];
+      const websiteCounts = {};
+      const blogsByWebsite = {};
+      
+      toReadEntries.forEach(entry => {
+        if (entry.website && entry.website.trim() !== '') {
+          const key = entry.website.trim();
+          websiteCounts[key] = (websiteCounts[key] || 0) + 1;
+          if (!blogsByWebsite[key]) blogsByWebsite[key] = [];
+          blogsByWebsite[key].push(entry);
+        }
+      });
+      
+      const sortedWebsites = Object.entries(websiteCounts)
+        .map(([name, count]) => ({name, count}))
+        .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+      
+      showModal('websites', sortedWebsites, blogsByWebsite);
+    });
+  }
+  
+  function showModal(type, items, blogsByKey) {
+    const modal = document.getElementById('websites-modal');
+    modal.innerHTML = `
+      <div class="modal-content">
+        <button class="modal-close" aria-label="Close">&times;</button>
+        <h2>Websites</h2>
+        <div class="toggle-list">
+          ${items.map(item => {
+            const blogs = (blogsByKey[item.name] || []).slice().sort((a, b) => new Date(b.date) - new Date(a.date));
+            return `
+              <details>
+                <summary>${item.name} <span style='color:#888;font-size:13px;'>(${item.count})</span></summary>
+                <ul class='toggle-blogs'>
+                  ${blogs.map(blog => {
+                    let url = blog.url || '#';
+                    let title = blog.title || 'Untitled';
+                    return `<li><a href='${url}' class='toggle-link' target='_blank' rel='noopener'>${title}</a></li>`;
+                  }).join('')}
+                </ul>
+              </details>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+    modal.style.display = 'flex';
+    
+    // Close logic
+    modal.querySelector('.modal-close').onclick = () => { modal.style.display = 'none'; };
+    modal.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
   }
   
   function updateEntriesList() {
