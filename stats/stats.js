@@ -188,7 +188,8 @@ document.addEventListener('DOMContentLoaded', function() {
             tooltip.className = 'custom-tooltip';
             tooltip.style.left = (e.clientX + 10) + 'px';
             tooltip.style.top = (e.clientY + 10) + 'px';
-            tooltip.innerHTML = `<div class='tooltip-date'>${dateStr}</div>`;
+            // Add blog count next to date
+            tooltip.innerHTML = `<div class='tooltip-date'>${dateStr} <span style="color:#888;font-size:13px;">(${blogs.length} blog${blogs.length === 1 ? '' : 's'})</span></div>`;
             if (blogs.length > 0) {
               tooltip.innerHTML += `<ul class='tooltip-list'>` + blogs.map((entry, idx) => {
                 let title = entry.title || 'Untitled';
