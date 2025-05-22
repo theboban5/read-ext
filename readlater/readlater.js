@@ -51,11 +51,25 @@ document.addEventListener('DOMContentLoaded', function() {
   
   function showWebsitesModal(e) {
     e.preventDefault();
-    chrome.runtime.sendMessage({action: 'getToReadEntries'}, function(response) {
-      const toReadEntries = response.toReadEntries || [];
+    
+    // Get both read later entries and blog entries
+    Promise.all([
+      new Promise(resolve => {
+        chrome.runtime.sendMessage({action: 'getToReadEntries'}, function(response) {
+          resolve(response.toReadEntries || []);
+        });
+      }),
+      new Promise(resolve => {
+        chrome.runtime.sendMessage({action: 'getBlogEntries'}, function(response) {
+          resolve(response.blogEntries || []);
+        });
+      })
+    ]).then(([toReadEntries, blogEntries]) => {
       const websiteCounts = {};
       const blogsByWebsite = {};
+      const readStatsByWebsite = {};
       
+      // Process read later entries
       toReadEntries.forEach(entry => {
         if (entry.website && entry.website.trim() !== '') {
           const key = entry.website.trim();
@@ -65,8 +79,38 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       });
       
+      // Process previously read entries
+      blogEntries.forEach(entry => {
+        if (entry.website && entry.website.trim() !== '') {
+          const key = entry.website.trim();
+          if (!readStatsByWebsite[key]) {
+            readStatsByWebsite[key] = {
+              count: 0,
+              totalRating: 0,
+              avgRating: 0
+            };
+          }
+          readStatsByWebsite[key].count++;
+          if (entry.rating > 0) {
+            readStatsByWebsite[key].totalRating += entry.rating;
+          }
+        }
+      });
+      
+      // Calculate average ratings
+      Object.keys(readStatsByWebsite).forEach(key => {
+        const stats = readStatsByWebsite[key];
+        if (stats.count > 0) {
+          stats.avgRating = stats.totalRating / stats.count;
+        }
+      });
+      
       const sortedWebsites = Object.entries(websiteCounts)
-        .map(([name, count]) => ({name, count}))
+        .map(([name, count]) => ({
+          name,
+          count,
+          readStats: readStatsByWebsite[name] || { count: 0, avgRating: 0 }
+        }))
         .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
       
       showModal('websites', sortedWebsites, blogsByWebsite);
@@ -82,9 +126,20 @@ document.addEventListener('DOMContentLoaded', function() {
         <div class="toggle-list">
           ${items.map(item => {
             const blogs = (blogsByKey[item.name] || []).slice().sort((a, b) => new Date(b.date) - new Date(a.date));
+            const readStats = item.readStats;
+            const readStatsHtml = readStats.count > 0 
+              ? `<span style='color:#666;font-size:13px;margin-left:8px;'>
+                   (Previously read: ${readStats.count}, Avg rating: ${readStats.avgRating.toFixed(1)}★)
+                 </span>`
+              : '';
+            
             return `
               <details>
-                <summary>${item.name} <span style='color:#888;font-size:13px;'>(${item.count})</span></summary>
+                <summary>
+                  ${item.name} 
+                  <span style='color:#888;font-size:13px;'>(${item.count} to read)</span>
+                  ${readStatsHtml}
+                </summary>
                 <ul class='toggle-blogs'>
                   ${blogs.map(blog => {
                     let url = blog.url || '#';
