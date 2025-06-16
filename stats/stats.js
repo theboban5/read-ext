@@ -75,6 +75,18 @@ document.addEventListener('DOMContentLoaded', function() {
         const oneYearAgo = new Date();
         oneYearAgo.setDate(today.getDate() - 365);
         
+        // Calculate number of articles read in the last year
+        const readsLastYear = blogEntries.filter(entry => {
+          if (!entry.date) return false;
+          const entryDate = new Date(entry.date);
+          return entryDate >= oneYearAgo && entryDate <= today;
+        }).length;
+        // Update the activity graph heading
+        const activityHeader = document.querySelector('#activity-graph-container').previousElementSibling;
+        if (activityHeader && activityHeader.tagName === 'H2') {
+          activityHeader.textContent = `${readsLastYear} read${readsLastYear === 1 ? '' : 's'} in the last year`;
+        }
+        
         // Create a map for counting blog entries by date
         const entriesByDate = new Map();
         // Create a map for storing blog entries by date
@@ -121,6 +133,52 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Create Github-style activity graph
         activityGraphContainer.innerHTML = '';
+        
+        // --- Add month labels row ---
+        const monthLabelsDiv = document.createElement('div');
+        monthLabelsDiv.className = 'month-labels';
+        monthLabelsDiv.style.display = 'flex';
+        monthLabelsDiv.style.marginLeft = '32px'; // align with graph
+        monthLabelsDiv.style.marginBottom = '2px';
+        monthLabelsDiv.style.height = '16px';
+        monthLabelsDiv.style.fontSize = '11px';
+        monthLabelsDiv.style.color = '#888';
+        
+        // Calculate weeks and months
+        let months = [];
+        let lastMonth = null;
+        let d = new Date(oneYearAgo);
+        let todayCopy = new Date(today);
+        let weekIndex = 0;
+        let firstDayOfWeek = d.getDay();
+        // Add empty label for alignment
+        if (firstDayOfWeek > 0) {
+          const emptyLabel = document.createElement('div');
+          emptyLabel.style.width = `${firstDayOfWeek * 16}px`;
+          emptyLabel.style.display = 'inline-block';
+          monthLabelsDiv.appendChild(emptyLabel);
+        }
+        while (d <= todayCopy) {
+          const month = d.getMonth();
+          if (month !== lastMonth) {
+            // Add month label
+            const monthLabel = document.createElement('div');
+            monthLabel.textContent = d.toLocaleString('default', { month: 'short' });
+            monthLabel.style.width = '56px'; // 7 days * 8px width per cell
+            monthLabel.style.display = 'inline-block';
+            monthLabelsDiv.appendChild(monthLabel);
+            lastMonth = month;
+          } else {
+            // Add empty space for non-first week of month
+            const empty = document.createElement('div');
+            empty.style.width = '8px';
+            empty.style.display = 'inline-block';
+            monthLabelsDiv.appendChild(empty);
+          }
+          d.setDate(d.getDate() + 7 - d.getDay()); // jump to next week's first day
+        }
+        activityGraphContainer.appendChild(monthLabelsDiv);
+        // --- End month labels row ---
         
         // Create days of week labels
         const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
