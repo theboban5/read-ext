@@ -400,10 +400,13 @@ document.addEventListener('DOMContentLoaded', function() {
         const blogsByAuthor = {};
         blogEntries.forEach(entry => {
           if (entry.author && entry.author.trim() !== '') {
-            const key = entry.author.trim();
-            authorCounts[key] = (authorCounts[key] || 0) + 1;
-            if (!blogsByAuthor[key]) blogsByAuthor[key] = [];
-            blogsByAuthor[key].push(entry);
+            // Split by comma, trim each author, and add the blog to each
+            entry.author.split(/,|\/|\band\b/gi).map(a => a.trim()).forEach(authorName => {
+              if (!authorName) return;
+              authorCounts[authorName] = (authorCounts[authorName] || 0) + 1;
+              if (!blogsByAuthor[authorName]) blogsByAuthor[authorName] = [];
+              blogsByAuthor[authorName].push(entry);
+            });
           }
         });
         const sortedAuthors = Object.entries(authorCounts)
