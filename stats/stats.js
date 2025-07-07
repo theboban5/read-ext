@@ -406,6 +406,15 @@ document.addEventListener('DOMContentLoaded', function() {
     // Modal logic for authors and websites
     function showModal(type, items, blogsByKey) {
       const modal = document.getElementById(type === 'authors' ? 'authors-modal' : 'websites-modal');
+      // Helper to render a rating bar (0-5 scale)
+      function renderRatingBar(rating) {
+        const percent = Math.max(0, Math.min(100, (rating / 5) * 100));
+        return `<span class='rating-bar-container' title='Average rating: ${rating.toFixed(2)}'>
+          <span class='rating-bar-bg'></span>
+          <span class='rating-bar-fill' style='width:${percent}%;'></span>
+        </span>
+        <span class='rating-bar-value'>${rating.toFixed(2)}/5</span>`;
+      }
       modal.innerHTML = `
         <div class="modal-content">
           <button class="modal-close" aria-label="Close">&times;</button>
@@ -419,20 +428,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 const sum = blogs.reduce((acc, b) => acc + (b.rating || 0), 0);
                 avgRating = sum / blogs.length;
               }
-              // Half-star logic
-              function renderStars(rating) {
-                const fullStars = Math.floor(rating);
-                const halfStar = rating - fullStars >= 0.25 && rating - fullStars < 0.75 ? 1 : 0;
-                const emptyStars = 5 - fullStars - halfStar;
-                return '★'.repeat(fullStars) + (halfStar ? '⯨' : '') + '☆'.repeat(emptyStars);
-              }
-              let avgStars = avgRating ? `<span class='toggle-rating' title='Average rating'>${renderStars(avgRating)}</span>` : '';
+              let avgBar = avgRating ? renderRatingBar(avgRating) : '';
               return `
                 <details>
-                  <summary>${item.name} <span style='color:#888;font-size:13px;'>(${item.count})</span> ${avgStars}</summary>
+                  <summary>${item.name} <span style='color:#888;font-size:13px;'>(${item.count})</span> ${avgBar}</summary>
                   <ul class='toggle-blogs'>
                     ${blogs.map(blog => {
-                      let rating = blog.rating ? `<span class='toggle-rating'>${'★'.repeat(blog.rating)}${'☆'.repeat(5 - blog.rating)}</span>` : '';
+                      let rating = blog.rating ? renderRatingBar(blog.rating) : '';
                       let url = blog.url || '#';
                       let title = blog.title || 'Untitled';
                       return `<li><a href='${url}' class='toggle-link' target='_blank' rel='noopener'>${title}</a> ${rating}</li>`;
