@@ -415,37 +415,87 @@ document.addEventListener('DOMContentLoaded', function() {
         </span>
         <span class='rating-bar-value'>${rating.toFixed(2)}/5</span>`;
       }
+      // Compute stats for sorting
+      const itemsWithStats = items.map(item => {
+        const blogs = (blogsByKey[item.name] || []);
+        let avgRating = 0;
+        let fiveStarCount = 0;
+        let lastRead = null;
+        if (blogs.length > 0) {
+          const sum = blogs.reduce((acc, b) => acc + (b.rating || 0), 0);
+          avgRating = sum / blogs.length;
+          fiveStarCount = blogs.filter(b => b.rating === 5).length;
+          lastRead = blogs.reduce((latest, b) => {
+            const d = b.date ? new Date(b.date) : null;
+            return (!latest || (d && d > latest)) ? d : latest;
+          }, null);
+        }
+        return {...item, avgRating, fiveStarCount, lastRead, blogs};
+      });
+      // Modal HTML with sort dropdown
       modal.innerHTML = `
         <div class="modal-content">
           <button class="modal-close" aria-label="Close">&times;</button>
           <h2>${type === 'authors' ? 'Authors' : 'Websites'}</h2>
-          <div class="toggle-list">
-            ${items.map(item => {
-              const blogs = (blogsByKey[item.name] || []).slice().sort((a, b) => (b.rating || 0) - (a.rating || 0));
-              // Calculate average rating
-              let avgRating = 0;
-              if (blogs.length > 0) {
-                const sum = blogs.reduce((acc, b) => acc + (b.rating || 0), 0);
-                avgRating = sum / blogs.length;
-              }
-              let avgBar = avgRating ? renderRatingBar(avgRating) : '';
-              return `
-                <details>
-                  <summary>${item.name} <span style='color:#888;font-size:13px;'>(${item.count})</span> ${avgBar}</summary>
-                  <ul class='toggle-blogs'>
-                    ${blogs.map(blog => {
-                      let rating = blog.rating ? renderRatingBar(blog.rating) : '';
-                      let url = blog.url || '#';
-                      let title = blog.title || 'Untitled';
-                      return `<li><a href='${url}' class='toggle-link' target='_blank' rel='noopener'>${title}</a> ${rating}</li>`;
-                    }).join('')}
-                  </ul>
-                </details>
-              `;
-            }).join('')}
+          <div class="modal-sort-controls">
+            <label for="modal-sort-select">Sort by:</label>
+            <select id="modal-sort-select">
+              <option value="most-read">Most Read</option>
+              <option value="highest-avg">Highest Avg Rating</option>
+              <option value="lowest-avg">Lowest Avg Rating</option>
+              <option value="most-5star">Most 5★ Ratings</option>
+              <option value="last-read">Last Read</option>
+            </select>
           </div>
+          <div class="toggle-list" id="modal-toggle-list"></div>
         </div>
       `;
+      function renderList(sortType) {
+        let sorted = [...itemsWithStats];
+        switch (sortType) {
+          case 'highest-avg':
+            sorted.sort((a, b) => b.avgRating - a.avgRating || b.count - a.count || a.name.localeCompare(b.name));
+            break;
+          case 'lowest-avg':
+            sorted.sort((a, b) => a.avgRating - b.avgRating || b.count - a.count || a.name.localeCompare(b.name));
+            break;
+          case 'most-5star':
+            sorted.sort((a, b) => b.fiveStarCount - a.fiveStarCount || b.count - a.count || a.name.localeCompare(b.name));
+            break;
+          case 'last-read':
+            sorted.sort((a, b) => {
+              if (b.lastRead && a.lastRead) return b.lastRead - a.lastRead;
+              if (b.lastRead) return 1;
+              if (a.lastRead) return -1;
+              return b.count - a.count || a.name.localeCompare(b.name);
+            });
+            break;
+          case 'most-read':
+          default:
+            sorted.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+        }
+        document.getElementById('modal-toggle-list').innerHTML = sorted.map(item => {
+          let avgBar = item.avgRating ? renderRatingBar(item.avgRating) : '';
+          let lastReadStr = item.lastRead ? `<span class='last-read' title='Last read'>${item.lastRead.toLocaleDateString()}</span>` : '';
+          return `
+            <details>
+              <summary>${item.name} <span style='color:#888;font-size:13px;'>(${item.count})</span> ${avgBar} <span class='five-star-count' title='5-star ratings'>${item.fiveStarCount > 0 ? '★'.repeat(item.fiveStarCount) : ''}</span> ${lastReadStr}</summary>
+              <ul class='toggle-blogs'>
+                ${item.blogs.map(blog => {
+                  let rating = blog.rating ? renderRatingBar(blog.rating) : '';
+                  let url = blog.url || '#';
+                  let title = blog.title || 'Untitled';
+                  return `<li><a href='${url}' class='toggle-link' target='_blank' rel='noopener'>${title}</a> ${rating}</li>`;
+                }).join('')}
+              </ul>
+            </details>
+          `;
+        }).join('');
+      }
+      renderList('most-read');
+      document.getElementById('modal-sort-select').onchange = function(e) {
+        renderList(e.target.value);
+      };
       modal.style.display = 'flex';
       // Close logic
       modal.querySelector('.modal-close').onclick = () => { modal.style.display = 'none'; };
@@ -482,16 +532,19 @@ document.addEventListener('DOMContentLoaded', function() {
         const blogEntries = response.blogEntries || [];
         const websiteCounts = {};
         const blogsByWebsite = {};
+        const websiteDisplayNames = {};
         blogEntries.forEach(entry => {
           if (entry.website && entry.website.trim() !== '') {
-            const key = entry.website.trim();
+            const key = entry.website.trim().toLowerCase();
             websiteCounts[key] = (websiteCounts[key] || 0) + 1;
             if (!blogsByWebsite[key]) blogsByWebsite[key] = [];
             blogsByWebsite[key].push(entry);
+            // Store the display name (first encountered)
+            if (!websiteDisplayNames[key]) websiteDisplayNames[key] = entry.website.trim();
           }
         });
         const sortedWebsites = Object.entries(websiteCounts)
-          .map(([name, count]) => ({name, count}))
+          .map(([key, count]) => ({name: websiteDisplayNames[key], count}))
           .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
         showModal('websites', sortedWebsites, blogsByWebsite);
       });
