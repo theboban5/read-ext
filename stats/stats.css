@@ -139,7 +139,7 @@ body {
   }
   
   .entry-rating {
-    color: #ffd700;
+    color: #4285f4;
     font-size: 16px;
   }
   
@@ -228,7 +228,7 @@ body {
     font-size: 13px;
   }
   .custom-tooltip .tooltip-rating {
-    color: #ffd700;
+    color: #4285f4;
     font-size: 13px;
     margin-left: 6px;
     letter-spacing: 1px;
@@ -334,7 +334,7 @@ body {
     color: #174ea6;
   }
   .toggle-rating {
-    color: #ffd700;
+    color: #4285f4;
     font-size: 13px;
     margin-left: 6px;
     letter-spacing: 1px;
