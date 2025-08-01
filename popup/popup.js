@@ -84,8 +84,8 @@ document.addEventListener('DOMContentLoaded', function() {
       }
   
       // Save data to Chrome storage
-      chrome.storage.sync.get('blogEntries', function(data) {
-        const blogEntries = data.blogEntries || [];
+      chrome.runtime.sendMessage({action: 'getBlogEntries'}, function(response) {
+        const blogEntries = response.blogEntries || [];
         
         // Check if this URL already exists
         const existingIndex = blogEntries.findIndex(entry => entry.url === blogEntry.url);
@@ -100,12 +100,8 @@ document.addEventListener('DOMContentLoaded', function() {
           showMessage('Blog saved!', 'success');
         }
         
-        // Save to storage
-        chrome.storage.sync.set({blogEntries: blogEntries}, function() {
-          setTimeout(function() {
-            window.close();
-          }, 1500);
-        });
+        // Save to storage using background script
+        saveBlogEntries(blogEntries);
       });
     });
   
@@ -125,8 +121,8 @@ document.addEventListener('DOMContentLoaded', function() {
       }
       
       // Save to Chrome storage
-      chrome.storage.sync.get('toReadEntries', function(data) {
-        const toReadEntries = data.toReadEntries || [];
+      chrome.runtime.sendMessage({action: 'getToReadEntries'}, function(response) {
+        const toReadEntries = response.toReadEntries || [];
         
         // Check if URL already exists in to-read list
         const existingIndex = toReadEntries.findIndex(entry => entry.url === toReadEntry.url);
@@ -139,12 +135,8 @@ document.addEventListener('DOMContentLoaded', function() {
           toReadEntries.push(toReadEntry);
           showMessage('Added to read later!', 'success');
           
-          // Save to storage
-          chrome.storage.sync.set({toReadEntries: toReadEntries}, function() {
-            setTimeout(function() {
-              window.close();
-            }, 1500);
-          });
+          // Save to storage using background script
+          saveToReadEntries(toReadEntries);
         }
       });
     });
@@ -153,9 +145,9 @@ document.addEventListener('DOMContentLoaded', function() {
     randomizer.addEventListener('click', function(e) {
       e.preventDefault();
       
-      // Get the read later list
-      chrome.storage.sync.get('toReadEntries', function(data) {
-        const toReadEntries = data.toReadEntries || [];
+      // Get the read later list using the background script
+      chrome.runtime.sendMessage({action: 'getToReadEntries'}, function(response) {
+        const toReadEntries = response.toReadEntries || [];
         
         if (toReadEntries.length === 0) {
           showMessage('No articles in your read later list!', 'info');
@@ -185,5 +177,37 @@ document.addEventListener('DOMContentLoaded', function() {
         messageDiv.textContent = '';
         messageDiv.className = '';
       }, 3000);
+    }
+    
+    // Helper function to save blog entries
+    function saveBlogEntries(blogEntries) {
+      chrome.runtime.sendMessage({
+        action: 'saveBlogEntries',
+        blogEntries: blogEntries
+      }, function(response) {
+        if (response && response.success) {
+          setTimeout(function() {
+            window.close();
+          }, 1500);
+        } else {
+          showMessage('Error saving blog entry', 'error');
+        }
+      });
+    }
+    
+    // Helper function to save to-read entries
+    function saveToReadEntries(toReadEntries) {
+      chrome.runtime.sendMessage({
+        action: 'saveToReadEntries',
+        toReadEntries: toReadEntries
+      }, function(response) {
+        if (response && response.success) {
+          setTimeout(function() {
+            window.close();
+          }, 1500);
+        } else {
+          showMessage('Error saving to read entry', 'error');
+        }
+      });
     }
   });

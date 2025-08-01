@@ -221,6 +221,86 @@ async function updateToReadEntriesInStorage(newToReadEntries) {
   }
 }
 
+// Function to save blog entries to storage (handles both normal and chunked)
+async function saveBlogEntriesToStorage(newBlogEntries) {
+  try {
+    // Check if we're using chunked storage
+    const data = await new Promise((resolve) => {
+      chrome.storage.sync.get(['chunked_metadata'], resolve);
+    });
+    
+    if (data.chunked_metadata) {
+      // Update chunked storage
+      await updateChunkedBlogEntries(newBlogEntries);
+    } else {
+      // Update normal sync storage
+      await new Promise((resolve, reject) => {
+        chrome.storage.sync.set({blogEntries: newBlogEntries}, () => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+          } else {
+            resolve();
+          }
+        });
+      });
+    }
+  } catch (error) {
+    console.error('Error saving blog entries:', error);
+    throw error;
+  }
+}
+
+// Function to update blog entries in chunked storage
+async function updateChunkedBlogEntries(newBlogEntries) {
+  const CHUNK_SIZE = 50;
+  
+  // Get existing metadata
+  const data = await new Promise((resolve) => {
+    chrome.storage.sync.get(['chunked_metadata'], resolve);
+  });
+  
+  const metadata = data.chunked_metadata;
+  
+  // Split new blog entries into chunks
+  const blogChunks = [];
+  for (let i = 0; i < newBlogEntries.length; i += CHUNK_SIZE) {
+    blogChunks.push(newBlogEntries.slice(i, i + CHUNK_SIZE));
+  }
+  
+  // Update metadata
+  const updatedMetadata = {
+    ...metadata,
+    blogChunks: blogChunks.length,
+    totalBlogs: newBlogEntries.length
+  };
+  
+  // Prepare storage data
+  const storageData = {
+    'chunked_metadata': updatedMetadata
+  };
+  
+  // Add new blog chunks
+  blogChunks.forEach((chunk, index) => {
+    storageData[`blog_chunk_${index}`] = chunk;
+  });
+  
+  // Remove old blog chunks
+  for (let i = blogChunks.length; i < metadata.blogChunks; i++) {
+    storageData[`blog_chunk_${i}`] = null; // This will remove the key
+  }
+  
+  // Store updated data
+  await new Promise((resolve, reject) => {
+    chrome.storage.sync.set(storageData, () => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+      } else {
+        resolve();
+      }
+    });
+  });
+}
+
 // Function to update to-read entries in chunked storage
 async function updateChunkedToReadEntries(newToReadEntries) {
   const CHUNK_SIZE = 50;
@@ -304,6 +384,22 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
       sendResponse({success: true, message: 'Backup restored successfully'});
     }).catch((error) => {
       sendResponse({success: false, message: 'Restore failed: ' + error.message});
+    });
+    return true; // Indicate async response
+  } else if (request.action === 'saveBlogEntries') {
+    // Save blog entries
+    saveBlogEntriesToStorage(request.blogEntries).then(() => {
+      sendResponse({success: true});
+    }).catch((error) => {
+      sendResponse({success: false, message: error.message});
+    });
+    return true; // Indicate async response
+  } else if (request.action === 'saveToReadEntries') {
+    // Save to-read entries
+    updateToReadEntriesInStorage(request.toReadEntries).then(() => {
+      sendResponse({success: true});
+    }).catch((error) => {
+      sendResponse({success: false, message: error.message});
     });
     return true; // Indicate async response
   }
