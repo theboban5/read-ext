@@ -91,7 +91,7 @@ async function migrateFromLocalToSync() {
 
 // Function to migrate data to chunked storage
 async function migrateToChunkedStorage(blogEntries, toReadEntries) {
-  const CHUNK_SIZE = 50; // Number of entries per chunk
+  const CHUNK_SIZE = 25; // Reduced chunk size to avoid quota issues
   
   try {
     // Split blog entries into chunks
@@ -130,18 +130,51 @@ async function migrateToChunkedStorage(blogEntries, toReadEntries) {
       storageData[`toread_chunk_${index}`] = chunk;
     });
     
-    // Store in sync storage
-    await new Promise((resolve, reject) => {
-      chrome.storage.sync.set(storageData, () => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-        } else {
-          resolve();
-        }
-      });
-    });
+    // Store in sync storage with retry mechanism
+    let retryCount = 0;
+    const maxRetries = 3;
     
-    console.log(`Successfully migrated to chunked storage: ${blogChunks.length} blog chunks, ${toReadChunks.length} to-read chunks`);
+    while (retryCount < maxRetries) {
+      try {
+        await new Promise((resolve, reject) => {
+          chrome.storage.sync.set(storageData, () => {
+            if (chrome.runtime.lastError) {
+              console.error('Chunked storage error (attempt ' + (retryCount + 1) + '):', chrome.runtime.lastError);
+              reject(new Error(chrome.runtime.lastError.message));
+            } else {
+              resolve();
+            }
+          });
+        });
+        
+        console.log(`Successfully migrated to chunked storage: ${blogChunks.length} blog chunks, ${toReadChunks.length} to-read chunks`);
+        return; // Success, exit retry loop
+        
+      } catch (error) {
+        retryCount++;
+        if (retryCount >= maxRetries) {
+          console.error('Max retries reached for chunked storage, falling back to local storage');
+          // Fallback to local storage
+          await new Promise((resolve, reject) => {
+            chrome.storage.local.set({
+              blogEntries: blogEntries,
+              toReadEntries: toReadEntries
+            }, () => {
+              if (chrome.runtime.lastError) {
+                reject(new Error(chrome.runtime.lastError.message));
+              } else {
+                console.log('Successfully saved to local storage as fallback');
+                resolve();
+              }
+            });
+          });
+          return;
+        } else {
+          console.log('Retrying chunked storage migration...');
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
+        }
+      }
+    }
   } catch (error) {
     console.error('Chunked storage migration failed:', error);
     throw error;
@@ -168,6 +201,69 @@ function setupMonthlyBackup() {
       });
     }
   });
+}
+
+// Function to clean up old entries to reduce storage size
+function cleanupOldEntries(blogEntries) {
+  if (blogEntries.length <= 500) {
+    return blogEntries; // Keep all entries if under 500
+  }
+  
+  console.log('Cleaning up old entries to reduce storage size...');
+  
+  // Sort by date (oldest first)
+  const sortedEntries = blogEntries.sort((a, b) => {
+    const dateA = new Date(a.date || 0);
+    const dateB = new Date(b.date || 0);
+    return dateA - dateB;
+  });
+  
+  // Keep the most recent 500 entries (more aggressive cleanup)
+  const cleanedEntries = sortedEntries.slice(-500);
+  
+  console.log(`Removed ${blogEntries.length - cleanedEntries.length} old entries`);
+  return cleanedEntries;
+}
+
+// Function to check storage quota and clear if necessary
+async function checkAndClearStorage() {
+  try {
+    // Try to get current storage usage
+    const data = await new Promise((resolve) => {
+      chrome.storage.sync.get(null, resolve);
+    });
+    
+    const totalSize = JSON.stringify(data).length;
+    console.log('Current storage usage:', totalSize, 'bytes');
+    
+    // If storage is nearly full (>95% of 100KB), clear old data
+    if (totalSize > 95000) {
+      console.log('Storage nearly full, clearing old data...');
+      
+      // Keep only the most recent 100 entries
+      const blogEntries = data.blogEntries || [];
+      const toReadEntries = data.toReadEntries || [];
+      
+      const recentBlogs = blogEntries.slice(-100);
+      const recentToRead = toReadEntries.slice(-50);
+      
+      await new Promise((resolve, reject) => {
+        chrome.storage.sync.set({
+          blogEntries: recentBlogs,
+          toReadEntries: recentToRead
+        }, () => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+          } else {
+            console.log('Storage cleared successfully');
+            resolve('Storage cleared to make room for new entries');
+          }
+        });
+      });
+    }
+  } catch (error) {
+    console.error('Error checking storage quota:', error);
+  }
 }
 
 // Function to clean up read-later list
@@ -224,35 +320,121 @@ async function updateToReadEntriesInStorage(newToReadEntries) {
 // Function to save blog entries to storage (handles both normal and chunked)
 async function saveBlogEntriesToStorage(newBlogEntries) {
   try {
+    console.log('Saving blog entries to storage:', newBlogEntries.length, 'entries');
+    
+    // Check storage quota first
+    const clearMessage = await checkAndClearStorage();
+    
+    // Check data size
+    let dataSize = JSON.stringify(newBlogEntries).length;
+    console.log('Data size:', dataSize, 'bytes');
+    
+    // If data is too large, try to clean up old entries
+    if (dataSize > 60000) { // More aggressive cleanup threshold
+      console.log('Data size approaching limit, cleaning up old entries...');
+      newBlogEntries = cleanupOldEntries(newBlogEntries);
+      dataSize = JSON.stringify(newBlogEntries).length;
+      console.log('After cleanup - Data size:', dataSize, 'bytes, entries:', newBlogEntries.length);
+    }
+    
     // Check if we're using chunked storage
     const data = await new Promise((resolve) => {
       chrome.storage.sync.get(['chunked_metadata'], resolve);
     });
     
+    // Check if data is too large for sync storage (100KB limit)
+    if (dataSize > 80000) { // Reduced threshold for safety
+      console.log('Data too large for sync storage, migrating to chunked storage...');
+      // Get current to-read entries to preserve them
+      const toReadEntries = await getToReadEntriesFromStorage();
+      await migrateToChunkedStorage(newBlogEntries, toReadEntries);
+      return;
+    }
+    
     if (data.chunked_metadata) {
+      console.log('Using chunked storage');
       // Update chunked storage
       await updateChunkedBlogEntries(newBlogEntries);
+    } else if (dataSize > 80000) {
+      // Data is too large, migrate to chunked storage
+      console.log('Data too large, migrating to chunked storage...');
+      const toReadEntries = await getToReadEntriesFromStorage();
+      await migrateToChunkedStorage(newBlogEntries, toReadEntries);
     } else {
-      // Update normal sync storage
-      await new Promise((resolve, reject) => {
-        chrome.storage.sync.set({blogEntries: newBlogEntries}, () => {
-          if (chrome.runtime.lastError) {
-            reject(new Error(chrome.runtime.lastError.message));
+      console.log('Using normal sync storage');
+      // Update normal sync storage with retry mechanism
+      let retryCount = 0;
+      const maxRetries = 3;
+      
+      while (retryCount < maxRetries) {
+        try {
+          await new Promise((resolve, reject) => {
+            chrome.storage.sync.set({blogEntries: newBlogEntries}, () => {
+                          if (chrome.runtime.lastError) {
+              console.error('Storage error (attempt ' + (retryCount + 1) + '):', chrome.runtime.lastError);
+              reject(new Error(chrome.runtime.lastError.message));
+            } else {
+              console.log('Successfully saved to sync storage');
+              resolve(clearMessage || 'Blog saved successfully');
+            }
+            });
+          });
+          break; // Success, exit retry loop
+        } catch (error) {
+          retryCount++;
+          if (retryCount >= maxRetries) {
+            console.error('Max retries reached, falling back to local storage');
+            // Fallback to local storage
+            await new Promise((resolve, reject) => {
+              chrome.storage.local.set({blogEntries: newBlogEntries}, () => {
+                if (chrome.runtime.lastError) {
+                  reject(new Error(chrome.runtime.lastError.message));
+                } else {
+                  console.log('Successfully saved to local storage as fallback');
+                  resolve();
+                }
+              });
+            });
           } else {
-            resolve();
+            console.log('Retrying storage operation...');
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
           }
-        });
-      });
+        }
+      }
     }
-  } catch (error) {
-    console.error('Error saving blog entries:', error);
-    throw error;
-  }
+      } catch (error) {
+      console.error('Error saving blog entries:', error);
+      
+      // If chunked storage fails, try local storage as fallback
+      if (error.message.includes('quota') || error.message.includes('Quota')) {
+        console.log('Storage quota exceeded, falling back to local storage...');
+        try {
+          await new Promise((resolve, reject) => {
+            chrome.storage.local.set({blogEntries: newBlogEntries}, () => {
+              if (chrome.runtime.lastError) {
+                reject(new Error(chrome.runtime.lastError.message));
+              } else {
+                console.log('Successfully saved to local storage as fallback');
+                resolve();
+              }
+            });
+          });
+          return; // Successfully saved to local storage
+        } catch (localError) {
+          console.error('Local storage also failed:', localError);
+          throw new Error('Both sync and local storage failed: ' + error.message);
+        }
+      }
+      
+      throw error;
+    }
 }
 
 // Function to update blog entries in chunked storage
 async function updateChunkedBlogEntries(newBlogEntries) {
-  const CHUNK_SIZE = 50;
+  const CHUNK_SIZE = 25; // Reduced chunk size to avoid quota issues
+  
+  console.log('Updating chunked blog entries:', newBlogEntries.length, 'entries');
   
   // Get existing metadata
   const data = await new Promise((resolve) => {
@@ -260,12 +442,15 @@ async function updateChunkedBlogEntries(newBlogEntries) {
   });
   
   const metadata = data.chunked_metadata;
+  console.log('Current metadata:', metadata);
   
   // Split new blog entries into chunks
   const blogChunks = [];
   for (let i = 0; i < newBlogEntries.length; i += CHUNK_SIZE) {
     blogChunks.push(newBlogEntries.slice(i, i + CHUNK_SIZE));
   }
+  
+  console.log('Created', blogChunks.length, 'chunks');
   
   // Update metadata
   const updatedMetadata = {
@@ -289,12 +474,16 @@ async function updateChunkedBlogEntries(newBlogEntries) {
     storageData[`blog_chunk_${i}`] = null; // This will remove the key
   }
   
+  console.log('Storage data keys:', Object.keys(storageData));
+  
   // Store updated data
   await new Promise((resolve, reject) => {
     chrome.storage.sync.set(storageData, () => {
       if (chrome.runtime.lastError) {
+        console.error('Chunked storage error:', chrome.runtime.lastError);
         reject(new Error(chrome.runtime.lastError.message));
       } else {
+        console.log('Successfully saved to chunked storage');
         resolve();
       }
     });
@@ -303,7 +492,7 @@ async function updateChunkedBlogEntries(newBlogEntries) {
 
 // Function to update to-read entries in chunked storage
 async function updateChunkedToReadEntries(newToReadEntries) {
-  const CHUNK_SIZE = 50;
+  const CHUNK_SIZE = 25; // Reduced chunk size to avoid quota issues
   
   // Get existing metadata
   const data = await new Promise((resolve) => {
@@ -356,51 +545,77 @@ async function updateChunkedToReadEntries(newToReadEntries) {
 chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
   if (request.action === 'getBlogEntries') {
     // Clean up read-later list each time blogs are requested
-    cleanupReadLaterList();
-    
-    getBlogEntriesFromStorage().then(blogEntries => {
-      sendResponse({blogEntries: blogEntries});
-    });
+    (async () => {
+      try {
+        await cleanupReadLaterList();
+        const blogEntries = await getBlogEntriesFromStorage();
+        sendResponse({blogEntries: blogEntries});
+      } catch (error) {
+        console.error('Error getting blog entries:', error);
+        sendResponse({blogEntries: []});
+      }
+    })();
     return true; // Indicate async response
   } else if (request.action === 'getToReadEntries') {
     // Also clean up when read-later list is requested
-    cleanupReadLaterList();
-    
-    getToReadEntriesFromStorage().then(toReadEntries => {
-      sendResponse({toReadEntries: toReadEntries});
-    });
+    (async () => {
+      try {
+        await cleanupReadLaterList();
+        const toReadEntries = await getToReadEntriesFromStorage();
+        sendResponse({toReadEntries: toReadEntries});
+      } catch (error) {
+        console.error('Error getting to-read entries:', error);
+        sendResponse({toReadEntries: []});
+      }
+    })();
     return true; // Indicate async response
   } else if (request.action === 'createBackup') {
     // Manual backup request
-    createBackup().then(() => {
-      sendResponse({success: true, message: 'Backup created successfully'});
-    }).catch((error) => {
-      sendResponse({success: false, message: 'Backup failed: ' + error.message});
-    });
+    (async () => {
+      try {
+        await createBackup();
+        sendResponse({success: true, message: 'Backup created successfully'});
+      } catch (error) {
+        console.error('Error creating backup:', error);
+        sendResponse({success: false, message: 'Backup failed: ' + error.message});
+      }
+    })();
     return true; // Indicate async response
   } else if (request.action === 'restoreBackup') {
     // Restore from backup
-    restoreBackup(request.fileContent).then(() => {
-      sendResponse({success: true, message: 'Backup restored successfully'});
-    }).catch((error) => {
-      sendResponse({success: false, message: 'Restore failed: ' + error.message});
-    });
+    (async () => {
+      try {
+        await restoreBackup(request.fileContent);
+        sendResponse({success: true, message: 'Backup restored successfully'});
+      } catch (error) {
+        console.error('Error restoring backup:', error);
+        sendResponse({success: false, message: 'Restore failed: ' + error.message});
+      }
+    })();
     return true; // Indicate async response
   } else if (request.action === 'saveBlogEntries') {
     // Save blog entries
-    saveBlogEntriesToStorage(request.blogEntries).then(() => {
-      sendResponse({success: true});
-    }).catch((error) => {
-      sendResponse({success: false, message: error.message});
-    });
+    (async () => {
+      try {
+        const message = await saveBlogEntriesToStorage(request.blogEntries);
+        sendResponse({success: true, message: message});
+      } catch (error) {
+        console.error('Error saving blog entries:', error);
+        sendResponse({success: false, message: error.message});
+      }
+    })();
     return true; // Indicate async response
   } else if (request.action === 'saveToReadEntries') {
     // Save to-read entries
-    updateToReadEntriesInStorage(request.toReadEntries).then(() => {
-      sendResponse({success: true});
-    }).catch((error) => {
-      sendResponse({success: false, message: error.message});
-    });
+    (async () => {
+      try {
+        await updateToReadEntriesInStorage(request.toReadEntries);
+        sendResponse({success: true});
+      } catch (error) {
+        console.error('Error saving to-read entries:', error);
+        sendResponse({success: false, message: error.message});
+      }
+    })();
     return true; // Indicate async response
   }
 });
@@ -415,11 +630,13 @@ async function getBlogEntriesFromStorage() {
     
     // If we have normal blog entries, return them
     if (data.blogEntries && data.blogEntries.length > 0) {
+      console.log('Found blog entries in sync storage:', data.blogEntries.length);
       return data.blogEntries;
     }
     
     // If we have chunked metadata, get from chunked storage
     if (data.chunked_metadata) {
+      console.log('Found chunked metadata, getting from chunked storage');
       return await getChunkedBlogEntries(data.chunked_metadata);
     }
     
@@ -427,6 +644,10 @@ async function getBlogEntriesFromStorage() {
     const localData = await new Promise((resolve) => {
       chrome.storage.local.get('blogEntries', resolve);
     });
+    
+    if (localData.blogEntries && localData.blogEntries.length > 0) {
+      console.log('Found blog entries in local storage:', localData.blogEntries.length);
+    }
     
     return localData.blogEntries || [];
   } catch (error) {

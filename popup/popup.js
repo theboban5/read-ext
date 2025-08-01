@@ -85,7 +85,14 @@ document.addEventListener('DOMContentLoaded', function() {
   
       // Save data to Chrome storage
       chrome.runtime.sendMessage({action: 'getBlogEntries'}, function(response) {
+        if (chrome.runtime.lastError) {
+          console.error('Error getting blog entries:', chrome.runtime.lastError);
+          showMessage('Error getting blog entries', 'error');
+          return;
+        }
+        
         const blogEntries = response.blogEntries || [];
+        console.log('Current blog entries:', blogEntries.length);
         
         // Check if this URL already exists
         const existingIndex = blogEntries.findIndex(entry => entry.url === blogEntry.url);
@@ -100,6 +107,7 @@ document.addEventListener('DOMContentLoaded', function() {
           showMessage('Blog saved!', 'success');
         }
         
+        console.log('Saving blog entries:', blogEntries.length);
         // Save to storage using background script
         saveBlogEntries(blogEntries);
       });
@@ -122,6 +130,12 @@ document.addEventListener('DOMContentLoaded', function() {
       
       // Save to Chrome storage
       chrome.runtime.sendMessage({action: 'getToReadEntries'}, function(response) {
+        if (chrome.runtime.lastError) {
+          console.error('Error getting to-read entries:', chrome.runtime.lastError);
+          showMessage('Error getting to-read entries', 'error');
+          return;
+        }
+        
         const toReadEntries = response.toReadEntries || [];
         
         // Check if URL already exists in to-read list
@@ -181,32 +195,63 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Helper function to save blog entries
     function saveBlogEntries(blogEntries) {
+      if (!blogEntries || !Array.isArray(blogEntries)) {
+        console.error('Invalid blog entries data:', blogEntries);
+        showMessage('Error: Invalid data', 'error');
+        return;
+      }
+      
+      console.log('Sending saveBlogEntries message with', blogEntries.length, 'entries');
       chrome.runtime.sendMessage({
         action: 'saveBlogEntries',
         blogEntries: blogEntries
       }, function(response) {
+        if (chrome.runtime.lastError) {
+          console.error('Error in saveBlogEntries:', chrome.runtime.lastError);
+          showMessage('Error saving blog entry: ' + chrome.runtime.lastError.message, 'error');
+          return;
+        }
+        
         if (response && response.success) {
+          console.log('Blog entries saved successfully');
+          if (response.message) {
+            showMessage(response.message, 'success');
+          }
           setTimeout(function() {
             window.close();
           }, 1500);
         } else {
-          showMessage('Error saving blog entry', 'error');
+          console.error('Save failed:', response);
+          showMessage('Error saving blog entry: ' + (response ? response.message : 'Unknown error'), 'error');
         }
       });
     }
     
     // Helper function to save to-read entries
     function saveToReadEntries(toReadEntries) {
+      if (!toReadEntries || !Array.isArray(toReadEntries)) {
+        console.error('Invalid to-read entries data:', toReadEntries);
+        showMessage('Error: Invalid data', 'error');
+        return;
+      }
+      
       chrome.runtime.sendMessage({
         action: 'saveToReadEntries',
         toReadEntries: toReadEntries
       }, function(response) {
+        if (chrome.runtime.lastError) {
+          console.error('Error in saveToReadEntries:', chrome.runtime.lastError);
+          showMessage('Error saving to read entry: ' + chrome.runtime.lastError.message, 'error');
+          return;
+        }
+        
         if (response && response.success) {
           setTimeout(function() {
             window.close();
           }, 1500);
         } else {
-          showMessage('Error saving to read entry', 'error');
+          console.error('Save failed:', response);
+          showMessage('Error saving to read entry: ' + (response ? response.message : 'Unknown error'), 'error');
         }
       });
     }
