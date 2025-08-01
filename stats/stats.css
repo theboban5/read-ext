@@ -394,6 +394,33 @@ body {
   .footer a:hover {
     text-decoration: underline;
   }
+  
+  .backup-controls {
+    margin-top: 15px;
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+  }
+  
+  .backup-btn {
+    background-color: #4285f4;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.2s;
+  }
+  
+  .backup-btn:hover {
+    background-color: #3367d6;
+  }
+  
+  .backup-btn:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+  }
 
   .modal-sort-controls {
     display: flex;

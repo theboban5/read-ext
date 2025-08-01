@@ -287,7 +287,7 @@ document.addEventListener('DOMContentLoaded', function() {
     };
     
     // Add to blog entries
-    chrome.storage.local.get('blogEntries', function(data) {
+    chrome.storage.sync.get('blogEntries', function(data) {
       let blogEntries = data.blogEntries || [];
       
       // Check if already exists
@@ -299,18 +299,18 @@ document.addEventListener('DOMContentLoaded', function() {
       }
       
       // Save to storage and remove from read later
-      chrome.storage.local.set({blogEntries: blogEntries}, function() {
+      chrome.storage.sync.set({blogEntries: blogEntries}, function() {
         removeFromReadLater(entry.url);
       });
     });
   }
   
   function removeFromReadLater(url) {
-    chrome.storage.local.get('toReadEntries', function(data) {
+    chrome.storage.sync.get('toReadEntries', function(data) {
       let toReadEntries = data.toReadEntries || [];
       const newList = toReadEntries.filter(entry => entry.url !== url);
       
-      chrome.storage.local.set({toReadEntries: newList}, function() {
+      chrome.storage.sync.set({toReadEntries: newList}, function() {
         updateEntriesList();
       });
     });

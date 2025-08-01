@@ -549,4 +549,56 @@ document.addEventListener('DOMContentLoaded', function() {
         showModal('websites', sortedWebsites, blogsByWebsite);
       });
     };
+
+    // Backup functionality
+    document.getElementById('create-backup').onclick = function(e) {
+      e.preventDefault();
+      const btn = this;
+      btn.disabled = true;
+      btn.textContent = 'Creating Backup...';
+      
+      chrome.runtime.sendMessage({action: 'createBackup'}, function(response) {
+        btn.disabled = false;
+        btn.textContent = 'Create Backup';
+        
+        if (response.success) {
+          alert('Backup created successfully! Check your Downloads folder.');
+        } else {
+          alert('Backup failed: ' + response.message);
+        }
+      });
+    };
+
+    document.getElementById('restore-backup').onclick = function(e) {
+      e.preventDefault();
+      document.getElementById('restore-file').click();
+    };
+
+    document.getElementById('restore-file').onchange = function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const fileContent = e.target.result;
+        
+        if (confirm('This will replace all your current data. Are you sure you want to restore from backup?')) {
+          chrome.runtime.sendMessage({
+            action: 'restoreBackup',
+            fileContent: fileContent
+          }, function(response) {
+            if (response.success) {
+              alert('Backup restored successfully! The page will reload.');
+              window.location.reload();
+            } else {
+              alert('Restore failed: ' + response.message);
+            }
+          });
+        }
+      };
+      reader.readAsText(file);
+      
+      // Reset the file input
+      e.target.value = '';
+    };
   });

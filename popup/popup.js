@@ -84,7 +84,7 @@ document.addEventListener('DOMContentLoaded', function() {
       }
   
       // Save data to Chrome storage
-      chrome.storage.local.get('blogEntries', function(data) {
+      chrome.storage.sync.get('blogEntries', function(data) {
         const blogEntries = data.blogEntries || [];
         
         // Check if this URL already exists
@@ -101,7 +101,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // Save to storage
-        chrome.storage.local.set({blogEntries: blogEntries}, function() {
+        chrome.storage.sync.set({blogEntries: blogEntries}, function() {
           setTimeout(function() {
             window.close();
           }, 1500);
@@ -125,7 +125,7 @@ document.addEventListener('DOMContentLoaded', function() {
       }
       
       // Save to Chrome storage
-      chrome.storage.local.get('toReadEntries', function(data) {
+      chrome.storage.sync.get('toReadEntries', function(data) {
         const toReadEntries = data.toReadEntries || [];
         
         // Check if URL already exists in to-read list
@@ -140,7 +140,7 @@ document.addEventListener('DOMContentLoaded', function() {
           showMessage('Added to read later!', 'success');
           
           // Save to storage
-          chrome.storage.local.set({toReadEntries: toReadEntries}, function() {
+          chrome.storage.sync.set({toReadEntries: toReadEntries}, function() {
             setTimeout(function() {
               window.close();
             }, 1500);
@@ -154,7 +154,7 @@ document.addEventListener('DOMContentLoaded', function() {
       e.preventDefault();
       
       // Get the read later list
-      chrome.storage.local.get('toReadEntries', function(data) {
+      chrome.storage.sync.get('toReadEntries', function(data) {
         const toReadEntries = data.toReadEntries || [];
         
         if (toReadEntries.length === 0) {

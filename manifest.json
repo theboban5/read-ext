@@ -3,7 +3,7 @@
     "name": "Blog Tracker",
     "version": "1.0",
     "description": "Track and rate blogs and essays you read",
-    "permissions": ["storage", "activeTab", "tabs"],
+    "permissions": ["storage", "activeTab", "tabs", "downloads", "alarms"],
     "action": {
       "default_popup": "popup/popup.html",
       "default_icon": {
