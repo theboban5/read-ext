@@ -295,16 +295,29 @@ async function cleanupReadLaterList() {
 // Function to update to-read entries in storage (handles both normal and chunked)
 async function updateToReadEntriesInStorage(newToReadEntries) {
   try {
-    // Check if we're using chunked storage
-    const data = await new Promise((resolve) => {
-      chrome.storage.sync.get(['chunked_metadata'], resolve);
+    console.log('Saving to-read entries to storage:', newToReadEntries.length, 'entries');
+    
+    // Check if we're using local storage (which we are now)
+    const localData = await new Promise((resolve) => {
+      chrome.storage.local.get(['blogEntries'], resolve);
     });
     
-    if (data.chunked_metadata) {
-      // Update chunked storage
-      await updateChunkedToReadEntries(newToReadEntries);
+    if (localData.blogEntries && localData.blogEntries.length > 0) {
+      // We're using local storage, so save to-read entries there too
+      console.log('Using local storage for to-read entries');
+      await new Promise((resolve, reject) => {
+        chrome.storage.local.set({toReadEntries: newToReadEntries}, () => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+          } else {
+            console.log('Successfully saved to-read entries to local storage');
+            resolve();
+          }
+        });
+      });
     } else {
-      // Update normal sync storage
+      // Fallback to sync storage if no local data
+      console.log('Using sync storage for to-read entries (fallback)');
       await new Promise((resolve, reject) => {
         chrome.storage.sync.set({toReadEntries: newToReadEntries}, () => {
           if (chrome.runtime.lastError) {
@@ -317,6 +330,7 @@ async function updateToReadEntriesInStorage(newToReadEntries) {
     }
   } catch (error) {
     console.error('Error updating to-read entries:', error);
+    throw error;
   }
 }
 
@@ -659,30 +673,39 @@ async function getBlogEntriesFromStorage() {
   }
 }
 
-// Function to get to-read entries from storage (handles both normal and chunked)
+// Function to get to-read entries from storage (prioritizes local storage)
 async function getToReadEntriesFromStorage() {
   try {
-    // First try to get from normal sync storage
-    const data = await new Promise((resolve) => {
+    // First try to get from local storage (our new primary storage)
+    const localData = await new Promise((resolve) => {
+      chrome.storage.local.get(['toReadEntries', 'blogEntries'], resolve);
+    });
+    
+    // If we have blog entries in local storage, use local storage for to-read too
+    if (localData.blogEntries && localData.blogEntries.length > 0) {
+      console.log('Found to-read entries in local storage:', (localData.toReadEntries || []).length);
+      return localData.toReadEntries || [];
+    }
+    
+    // Fallback to sync storage if no local data
+    const syncData = await new Promise((resolve) => {
       chrome.storage.sync.get(['toReadEntries', 'chunked_metadata'], resolve);
     });
     
-    // If we have normal to-read entries, return them
-    if (data.toReadEntries && data.toReadEntries.length > 0) {
-      return data.toReadEntries;
+    // If we have normal to-read entries in sync, return them
+    if (syncData.toReadEntries && syncData.toReadEntries.length > 0) {
+      console.log('Found to-read entries in sync storage:', syncData.toReadEntries.length);
+      return syncData.toReadEntries;
     }
     
     // If we have chunked metadata, get from chunked storage
-    if (data.chunked_metadata) {
-      return await getChunkedToReadEntries(data.chunked_metadata);
+    if (syncData.chunked_metadata) {
+      console.log('Getting to-read entries from chunked storage');
+      return await getChunkedToReadEntries(syncData.chunked_metadata);
     }
     
-    // Fallback to local storage
-    const localData = await new Promise((resolve) => {
-      chrome.storage.local.get('toReadEntries', resolve);
-    });
-    
-    return localData.toReadEntries || [];
+    console.log('No to-read entries found in any storage');
+    return [];
   } catch (error) {
     console.error('Error getting to-read entries:', error);
     return [];
