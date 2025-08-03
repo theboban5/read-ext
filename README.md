@@ -66,28 +66,75 @@ All data is stored locally and synced across your Chrome devices.
 
 ## Storage & Backup
 
-This extension uses **Chrome Sync Storage** for data persistence, which means:
-- ✅ Your data syncs across all your Chrome devices
-- ✅ Data survives browser cache clearing
-- ✅ Automatic monthly backups to local files
-- ✅ Manual backup/restore functionality
+This extension uses **Chrome Local Storage** for data persistence, which means:
+- ✅ Much higher storage limits (5-10MB vs 512KB)
+- ✅ No chunking headaches or quota issues
+- ✅ Data survives browser crashes and restarts
+- ✅ Automatic backups built into local storage
+- ✅ Manual export functionality for external backups
 
 ### Storage Capacity
-- **Sync Storage**: ~2,000 articles (512KB limit)
-- **Local Backups**: Unlimited (stored as JSON files)
+- **Local Storage**: ~10,000+ articles (5-10MB limit)
+- **No chunking required** - all data in one place
+- **Automatic backups** stored in local storage
+
+### Data Export & Backup
+To create external backups of your data:
+
+1. **Open the Stats page** in your extension
+2. **Open the browser console** (F12 → Console tab)
+3. **Copy and paste** the contents of `export-backup.js` into the console
+4. **Run export commands**:
+   - `exportAsCSV()` - Download as spreadsheet (Excel/Sheets)
+   - `exportAsJSON()` - Download complete backup
+   - `exportAll()` - Download both formats (recommended)
+
+### Backup Schedule
+- **Weekly**: `exportAsCSV()` for quick review
+- **Monthly**: `exportAll()` for complete backup
+- **Before major changes**: `exportAsJSON()` for safety
+
+Files are automatically dated and downloaded to your Downloads folder.
+
+### Troubleshooting
+
+**Data Loss Prevention:**
+- **Regular exports**: Use `exportAll()` monthly
+- **Before browser updates**: Export your data
+- **Before clearing cache**: Export your data
+- **Multiple backups**: Keep exports in different locations
+
+**If Data is Lost:**
+- Check if you have recent export files
+- Data may still be in local storage (survives most cache clearing)
+- Contact support if you need help recovering data
+
+**Storage Issues:**
+- Local storage has much higher limits than sync storage
+- No more chunking or quota exceeded errors
+- If you reach 10,000+ articles, consider periodic cleanup of old entries
 
 ### Backup Features
-- **Automatic**: Monthly backups created at 2am on the first day of the month
-- **Manual**: Create backups anytime from the Stats page
-- **Restore**: Import previous backups if needed
-- **Migration**: Automatic migration from old local storage
+- **Automatic**: Built-in backups stored in local storage
+- **Manual Export**: Download CSV/JSON files anytime
+- **Multiple Formats**: CSV for analysis, JSON for complete backup
+- **Auto-dated**: Files include export date in filename
 
-### Backup File Format
-Backup files are JSON with the following structure:
+### Export File Formats
+
+**CSV Format** (for Excel/Sheets):
+```csv
+Title,URL,Author,Website,Rating,Date,Date Added
+"How to Start Google","https://example.com",Paul Graham,paulgraham.com,4,2025-03-16,2025-03-16
+```
+
+**JSON Format** (complete backup):
 ```json
 {
-  "version": "1.0",
-  "timestamp": "2024-01-15T10:30:00.000Z",
+  "version": "2.0",
+  "exportDate": "2025-08-03T19:30:00.000Z",
+  "totalArticles": 575,
+  "totalToRead": 368,
   "blogEntries": [...],
   "toReadEntries": [...]
 }

@@ -205,8 +205,11 @@ function setupMonthlyBackup() {
 
 // Function to clean up old entries to reduce storage size
 function cleanupOldEntries(blogEntries) {
-  if (blogEntries.length <= 500) {
-    return blogEntries; // Keep all entries if under 500
+  // Increase limit to 2000 articles (as mentioned in README)
+  const MAX_ENTRIES = 2000;
+  
+  if (blogEntries.length <= MAX_ENTRIES) {
+    return blogEntries; // Keep all entries if under limit
   }
   
   console.log('Cleaning up old entries to reduce storage size...');
@@ -218,8 +221,8 @@ function cleanupOldEntries(blogEntries) {
     return dateA - dateB;
   });
   
-  // Keep the most recent 500 entries (more aggressive cleanup)
-  const cleanedEntries = sortedEntries.slice(-500);
+  // Keep the most recent entries (less aggressive cleanup)
+  const cleanedEntries = sortedEntries.slice(-MAX_ENTRIES);
   
   console.log(`Removed ${blogEntries.length - cleanedEntries.length} old entries`);
   return cleanedEntries;
@@ -330,7 +333,7 @@ async function saveBlogEntriesToStorage(newBlogEntries) {
     console.log('Data size:', dataSize, 'bytes');
     
     // If data is too large, try to clean up old entries
-    if (dataSize > 60000) { // More aggressive cleanup threshold
+    if (dataSize > 80000) { // Less aggressive cleanup threshold
       console.log('Data size approaching limit, cleaning up old entries...');
       newBlogEntries = cleanupOldEntries(newBlogEntries);
       dataSize = JSON.stringify(newBlogEntries).length;
