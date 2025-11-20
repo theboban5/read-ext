@@ -28,14 +28,16 @@ body {
     display: flex;
     justify-content: space-between;
     margin-bottom: 30px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    gap: 10px;
   }
   
   .stat-card {
     background-color: white;
     border-radius: 8px;
     padding: 15px;
-    width: 22%;
+    flex: 1 1 0;
+    min-width: 0;
     box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     text-align: center;
   }
@@ -155,9 +157,13 @@ body {
   }
   
   @media (max-width: 768px) {
+    .stats-summary {
+      flex-wrap: wrap;
+    }
+    
     .stat-card {
-      width: calc(50% - 10px);
-      margin-bottom: 20px;
+      flex: 1 1 calc(50% - 5px);
+      margin-bottom: 10px;
     }
     
     .filter-controls {
@@ -172,7 +178,7 @@ body {
   
   @media (max-width: 480px) {
     .stat-card {
-      width: 100%;
+      flex: 1 1 100%;
     }
   }
   
@@ -453,4 +459,43 @@ body {
     font-size: 12px;
     margin-left: 8px;
     vertical-align: middle;
+  }
+  
+  .five-star-list {
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+  
+  .five-star-entry {
+    padding: 12px 0;
+    border-bottom: 1px solid #eee;
+  }
+  
+  .five-star-entry:last-child {
+    border-bottom: none;
+  }
+  
+  .five-star-title {
+    display: block;
+    font-size: 16px;
+    font-weight: 500;
+    color: #1a73e8;
+    text-decoration: none;
+    margin-bottom: 4px;
+  }
+  
+  .five-star-title:hover {
+    text-decoration: underline;
+    color: #174ea6;
+  }
+  
+  .five-star-info {
+    color: #666;
+    font-size: 13px;
+    margin-bottom: 4px;
+  }
+  
+  .five-star-date {
+    color: #999;
+    font-size: 12px;
   }

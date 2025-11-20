@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const totalBlogsElement = document.getElementById('total-blogs');
     const uniqueAuthorsElement = document.getElementById('unique-authors');
     const uniqueWebsitesElement = document.getElementById('unique-websites');
+    const fiveStarCountElement = document.getElementById('five-star-count');
     const averageRatingElement = document.getElementById('average-rating');
     const activityGraphContainer = document.getElementById('activity-graph-container');
     const entriesListElement = document.getElementById('entries-list');
@@ -61,10 +62,14 @@ document.addEventListener('DOMContentLoaded', function() {
         ? validRatings.reduce((sum, entry) => sum + entry.rating, 0) / validRatings.length 
         : 0;
       
+      // Count 5-star articles
+      const fiveStarArticles = blogEntries.filter(entry => entry.rating === 5);
+      
       // Update DOM
       totalBlogsElement.textContent = totalBlogs;
       document.getElementById('unique-authors').textContent = uniqueAuthors.size;
       document.getElementById('unique-websites').textContent = uniqueWebsites.size;
+      fiveStarCountElement.textContent = fiveStarArticles.length;
       averageRatingElement.textContent = avgRating.toFixed(1);
     }
     
@@ -547,6 +552,53 @@ document.addEventListener('DOMContentLoaded', function() {
           .map(([key, count]) => ({name: websiteDisplayNames[key], count}))
           .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
         showModal('websites', sortedWebsites, blogsByWebsite);
+      });
+    };
+
+    document.getElementById('show-5star').onclick = function(e) {
+      e.preventDefault();
+      chrome.runtime.sendMessage({action: 'getBlogEntries'}, function(response) {
+        const blogEntries = response.blogEntries || [];
+        const fiveStarArticles = blogEntries.filter(entry => entry.rating === 5);
+        
+        // Sort by date (most recent first)
+        fiveStarArticles.sort((a, b) => {
+          const dateA = a.date ? new Date(a.date) : new Date(0);
+          const dateB = b.date ? new Date(b.date) : new Date(0);
+          return dateB - dateA;
+        });
+        
+        // Create modal content
+        const modal = document.getElementById('5star-modal');
+        modal.innerHTML = `
+          <div class="modal-content">
+            <button class="modal-close" aria-label="Close">&times;</button>
+            <h2>5 Star Articles (${fiveStarArticles.length})</h2>
+            <div class="five-star-list">
+              ${fiveStarArticles.length > 0 ? 
+                fiveStarArticles.map(entry => {
+                  const date = entry.date ? new Date(entry.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'Unknown date';
+                  const author = entry.author ? `by ${entry.author}` : '';
+                  const website = entry.website ? `on ${entry.website}` : '';
+                  const info = [author, website].filter(Boolean).join(' ');
+                  return `
+                    <div class="five-star-entry">
+                      <a href="${entry.url || '#'}" class="five-star-title" target="_blank" rel="noopener">${entry.title || 'Untitled'}</a>
+                      <div class="five-star-info">${info}</div>
+                      <div class="five-star-date">${date}</div>
+                    </div>
+                  `;
+                }).join('') :
+                '<p>No 5-star articles yet. Keep reading!</p>'
+              }
+            </div>
+          </div>
+        `;
+        
+        // Close logic
+        modal.querySelector('.modal-close').onclick = () => { modal.style.display = 'none'; };
+        modal.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
+        modal.style.display = 'flex';
       });
     };
 
