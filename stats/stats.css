@@ -63,6 +63,41 @@ body {
     box-shadow: 0 2px 5px rgba(0,0,0,0.1);
   }
   
+  .year-filter-container {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+  }
+  
+  .year-filter-btn {
+    background-color: #f6f8fa;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    padding: 5px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #24292f;
+    cursor: pointer;
+    transition: background-color 0.2s, border-color 0.2s;
+  }
+  
+  .year-filter-btn:hover {
+    background-color: #f3f4f6;
+    border-color: #d0d7de;
+  }
+  
+  .year-filter-btn.active {
+    background-color: #0969da;
+    border-color: #0969da;
+    color: white;
+  }
+  
+  .year-filter-btn.active:hover {
+    background-color: #0860ca;
+    border-color: #0860ca;
+  }
+  
   #activity-graph-container {
     height: 180px;
     margin-top: 20px;

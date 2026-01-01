@@ -10,6 +10,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('search-input');
     const sortSelect = document.getElementById('sort-select');
     
+    // Store all blog entries globally
+    let allBlogEntries = [];
+    let selectedYear = null; // null means "last year"
+    
     // Load blog entries
     loadBlogEntries();
     
@@ -19,30 +23,155 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function loadBlogEntries() {
       chrome.runtime.sendMessage({action: 'getBlogEntries'}, function(response) {
-        const blogEntries = response.blogEntries || [];
+        allBlogEntries = response.blogEntries || [];
         
-        if (blogEntries.length === 0) {
+        if (allBlogEntries.length === 0) {
           entriesListElement.innerHTML = '<p>No blog entries yet. Start tracking your reading!</p>';
           return;
         }
         
-        // Update stats summary
-        updateStatsSummary(blogEntries);
+        // Create year filter buttons
+        createYearFilters();
         
-        // Create activity graph
-        createActivityGraph(blogEntries);
+        // Update stats summary (default: last year)
+        updateStatsSummary(allBlogEntries, selectedYear);
+        
+        // Create activity graph (default: last year)
+        createActivityGraph(allBlogEntries, selectedYear);
         
         // Initialize entries list
         updateEntriesList();
       });
     }
     
-    function updateStatsSummary(blogEntries) {
-      const totalBlogs = blogEntries.length;
+    function createYearFilters() {
+      // Get all unique years from blog entries
+      const years = new Set();
+      const today = new Date();
+      const currentYear = today.getFullYear();
+      
+      allBlogEntries.forEach(entry => {
+        if (entry.date) {
+          const entryDate = new Date(entry.date);
+          const year = entryDate.getFullYear();
+          if (year <= currentYear) {
+            years.add(year);
+          }
+        }
+      });
+      
+      // Add current year if not present
+      years.add(currentYear);
+      
+      // Sort years in descending order
+      const sortedYears = Array.from(years).sort((a, b) => b - a);
+      
+      // Create year filter container
+      const activityGraphSection = document.querySelector('.activity-graph');
+      let yearFilterContainer = document.getElementById('year-filter-container');
+      
+      if (!yearFilterContainer) {
+        yearFilterContainer = document.createElement('div');
+        yearFilterContainer.id = 'year-filter-container';
+        yearFilterContainer.className = 'year-filter-container';
+        
+        // Insert after the h2 heading
+        const h2 = activityGraphSection.querySelector('h2');
+        h2.insertAdjacentElement('afterend', yearFilterContainer);
+      }
+      
+      yearFilterContainer.innerHTML = '';
+      
+      // Add "Last year" button
+      const lastYearBtn = document.createElement('button');
+      lastYearBtn.className = 'year-filter-btn active';
+      lastYearBtn.textContent = 'Last year';
+      lastYearBtn.dataset.year = '';
+      lastYearBtn.addEventListener('click', function() {
+        selectedYear = null;
+        updateYearFilterButtons();
+        updateStatsSummary(allBlogEntries, selectedYear);
+        createActivityGraph(allBlogEntries, selectedYear);
+      });
+      yearFilterContainer.appendChild(lastYearBtn);
+      
+      // Add year buttons
+      sortedYears.forEach(year => {
+        const yearBtn = document.createElement('button');
+        yearBtn.className = 'year-filter-btn';
+        yearBtn.textContent = year.toString();
+        yearBtn.dataset.year = year;
+        yearBtn.addEventListener('click', function() {
+          selectedYear = year;
+          updateYearFilterButtons();
+          updateStatsSummary(allBlogEntries, selectedYear);
+          createActivityGraph(allBlogEntries, selectedYear);
+        });
+        yearFilterContainer.appendChild(yearBtn);
+      });
+      
+      // Add "Total" button
+      const totalBtn = document.createElement('button');
+      totalBtn.className = 'year-filter-btn';
+      totalBtn.textContent = 'Total';
+      totalBtn.dataset.year = 'total';
+      totalBtn.addEventListener('click', function() {
+        selectedYear = 'total';
+        updateYearFilterButtons();
+        updateStatsSummary(allBlogEntries, selectedYear);
+        createActivityGraph(allBlogEntries, selectedYear);
+      });
+      yearFilterContainer.appendChild(totalBtn);
+    }
+    
+    function updateYearFilterButtons() {
+      const buttons = document.querySelectorAll('.year-filter-btn');
+      buttons.forEach(btn => {
+        const btnYear = btn.dataset.year === '' ? null : (btn.dataset.year === 'total' ? 'total' : parseInt(btn.dataset.year));
+        if (btnYear === selectedYear) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+    }
+    
+    function updateStatsSummary(blogEntries, yearFilter) {
+      // Filter entries by year if specified
+      let filteredEntries = blogEntries;
+      const today = new Date();
+      
+      if (yearFilter === 'total') {
+        // Show all entries (no filtering)
+        filteredEntries = blogEntries;
+      } else if (yearFilter !== null) {
+        filteredEntries = blogEntries.filter(entry => {
+          if (!entry.date) return false;
+          const entryDate = new Date(entry.date);
+          const entryYear = entryDate.getFullYear();
+          if (entryYear !== yearFilter) return false;
+          // If it's the current year, only include entries up to today
+          if (yearFilter === today.getFullYear()) {
+            return entryDate <= today;
+          }
+          return true;
+        });
+      } else {
+        // Filter to last 365 days
+        const oneYearAgo = new Date();
+        oneYearAgo.setDate(today.getDate() - 365);
+        filteredEntries = blogEntries.filter(entry => {
+          if (!entry.date) return false;
+          const entryDate = new Date(entry.date);
+          return entryDate >= oneYearAgo && entryDate <= today;
+        });
+      }
+      
+      const totalBlogs = filteredEntries.length;
       
       // Get unique authors
       const uniqueAuthors = new Set();
-      blogEntries.forEach(entry => {
+      filteredEntries.forEach(entry => {
         if (entry.author && entry.author.trim() !== '') {
           uniqueAuthors.add(entry.author.trim().toLowerCase());
         }
@@ -50,20 +179,20 @@ document.addEventListener('DOMContentLoaded', function() {
       
       // Get unique websites
       const uniqueWebsites = new Set();
-      blogEntries.forEach(entry => {
+      filteredEntries.forEach(entry => {
         if (entry.website && entry.website.trim() !== '') {
           uniqueWebsites.add(entry.website.trim().toLowerCase());
         }
       });
       
       // Calculate average rating
-      const validRatings = blogEntries.filter(entry => entry.rating > 0);
+      const validRatings = filteredEntries.filter(entry => entry.rating > 0);
       const avgRating = validRatings.length > 0 
         ? validRatings.reduce((sum, entry) => sum + entry.rating, 0) / validRatings.length 
         : 0;
       
       // Count 5-star articles
-      const fiveStarArticles = blogEntries.filter(entry => entry.rating === 5);
+      const fiveStarArticles = filteredEntries.filter(entry => entry.rating === 5);
       
       // Update DOM
       totalBlogsElement.textContent = totalBlogs;
@@ -73,23 +202,45 @@ document.addEventListener('DOMContentLoaded', function() {
       averageRatingElement.textContent = avgRating.toFixed(1);
     }
     
-    function createActivityGraph(blogEntries) {
+    function createActivityGraph(blogEntries, yearFilter) {
       try {
-        // Get date range (last 365 days)
+        let startDate, endDate, titleText;
         const today = new Date();
-        const oneYearAgo = new Date();
-        oneYearAgo.setDate(today.getDate() - 365);
         
-        // Calculate number of articles read in the last year
-        const readsLastYear = blogEntries.filter(entry => {
-          if (!entry.date) return false;
-          const entryDate = new Date(entry.date);
-          return entryDate >= oneYearAgo && entryDate <= today;
-        }).length;
+        if (yearFilter === 'total') {
+          // For "total", just show the last year view (same as "last year" filter)
+          endDate = new Date(today);
+          startDate = new Date(today);
+          startDate.setDate(endDate.getDate() - 365);
+          const totalReads = blogEntries.length;
+          titleText = `${totalReads} read${totalReads === 1 ? '' : 's'} total`;
+        } else if (yearFilter !== null) {
+          // Filter to specific year - show full year (365/366 days)
+          startDate = new Date(yearFilter, 0, 1); // January 1st of the year
+          endDate = new Date(yearFilter, 11, 31, 23, 59, 59); // December 31st of the year
+          const readsInYear = blogEntries.filter(entry => {
+            if (!entry.date) return false;
+            const entryDate = new Date(entry.date);
+            return entryDate >= startDate && entryDate <= endDate;
+          }).length;
+          titleText = `${readsInYear} read${readsInYear === 1 ? '' : 's'} in ${yearFilter}`;
+        } else {
+          // Filter to last 365 days
+          endDate = new Date(today);
+          startDate = new Date(today);
+          startDate.setDate(endDate.getDate() - 365);
+          const readsLastYear = blogEntries.filter(entry => {
+            if (!entry.date) return false;
+            const entryDate = new Date(entry.date);
+            return entryDate >= startDate && entryDate <= endDate;
+          }).length;
+          titleText = `${readsLastYear} read${readsLastYear === 1 ? '' : 's'} in the last year`;
+        }
+        
         // Update the activity graph heading
         const activityHeader = document.querySelector('#activity-graph-container').previousElementSibling;
         if (activityHeader && activityHeader.tagName === 'H2') {
-          activityHeader.textContent = `${readsLastYear} read${readsLastYear === 1 ? '' : 's'} in the last year`;
+          activityHeader.textContent = titleText;
         }
         
         // Create a map for counting blog entries by date
@@ -97,8 +248,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // Create a map for storing blog entries by date
         const blogsByDate = new Map();
         
-        // Initialize with empty counts and empty arrays
-        for (let d = new Date(oneYearAgo); d <= today; d.setDate(d.getDate() + 1)) {
+        // Initialize with empty counts and empty arrays for ALL days in the range
+        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
           const dateStr = formatDate(d);
           entriesByDate.set(dateStr, 0);
           blogsByDate.set(dateStr, []);
@@ -110,7 +261,8 @@ document.addEventListener('DOMContentLoaded', function() {
             try {
               if (entry && entry.date) {
                 const entryDate = new Date(entry.date);
-                if (entryDate >= oneYearAgo && entryDate <= today) {
+                // Check if entry is within the date range (use startDate and endDate, not today)
+                if (entryDate >= startDate && entryDate <= endDate) {
                   const dateStr = formatDate(entryDate);
                   
                   // Update count
@@ -152,8 +304,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // Calculate weeks and months
         let months = [];
         let lastMonth = null;
-        let d = new Date(oneYearAgo);
-        let todayCopy = new Date(today);
+        let d = new Date(startDate);
+        let endDateCopy = new Date(endDate);
         let weekIndex = 0;
         let firstDayOfWeek = d.getDay();
         // Add empty label for alignment
@@ -163,7 +315,7 @@ document.addEventListener('DOMContentLoaded', function() {
           emptyLabel.style.display = 'inline-block';
           monthLabelsDiv.appendChild(emptyLabel);
         }
-        while (d <= todayCopy) {
+        while (d <= endDateCopy) {
           const month = d.getMonth();
           if (month !== lastMonth) {
             // Add month label
@@ -218,7 +370,7 @@ document.addEventListener('DOMContentLoaded', function() {
         graphDiv.style.flexWrap = 'wrap';
         graphDiv.style.width = '100%';
         
-        let currentDate = new Date(oneYearAgo);
+        let currentDate = new Date(startDate);
         const startDay = currentDate.getDay();
         
         // Add empty cells for alignment
@@ -229,8 +381,8 @@ document.addEventListener('DOMContentLoaded', function() {
           graphDiv.appendChild(emptyCell);
         }
         
-        // Add day cells
-        for (let d = new Date(oneYearAgo); d <= today; d.setDate(d.getDate() + 1)) {
+        // Add day cells - show all days in the range (including empty days)
+        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
           const dateStr = formatDate(d);
           const count = entriesByDate.get(dateStr) || 0;
           const blogs = blogsByDate.get(dateStr) || [];
@@ -408,6 +560,37 @@ document.addEventListener('DOMContentLoaded', function() {
       return date.toLocaleDateString('en-US', options);
     }
     
+    // Helper function to filter blog entries by year filter
+    function filterEntriesByYear(blogEntries, yearFilter) {
+      const today = new Date();
+      
+      if (yearFilter === 'total') {
+        // Show all entries (no filtering)
+        return blogEntries;
+      } else if (yearFilter !== null) {
+        return blogEntries.filter(entry => {
+          if (!entry.date) return false;
+          const entryDate = new Date(entry.date);
+          const entryYear = entryDate.getFullYear();
+          if (entryYear !== yearFilter) return false;
+          // If it's the current year, only include entries up to today
+          if (yearFilter === today.getFullYear()) {
+            return entryDate <= today;
+          }
+          return true;
+        });
+      } else {
+        // Filter to last 365 days
+        const oneYearAgo = new Date();
+        oneYearAgo.setDate(today.getDate() - 365);
+        return blogEntries.filter(entry => {
+          if (!entry.date) return false;
+          const entryDate = new Date(entry.date);
+          return entryDate >= oneYearAgo && entryDate <= today;
+        });
+      }
+    }
+    
     // Modal logic for authors and websites
     function showModal(type, items, blogsByKey) {
       const modal = document.getElementById(type === 'authors' ? 'authors-modal' : 'websites-modal');
@@ -509,97 +692,94 @@ document.addEventListener('DOMContentLoaded', function() {
 
     document.getElementById('show-authors').onclick = function(e) {
       e.preventDefault();
-      chrome.runtime.sendMessage({action: 'getBlogEntries'}, function(response) {
-        const blogEntries = response.blogEntries || [];
-        const authorCounts = {};
-        const blogsByAuthor = {};
-        blogEntries.forEach(entry => {
-          if (entry.author && entry.author.trim() !== '') {
-            // Split by comma, trim each author, and add the blog to each
-            entry.author.split(/,|\/|\band\b/gi).map(a => a.trim()).forEach(authorName => {
-              if (!authorName) return;
-              authorCounts[authorName] = (authorCounts[authorName] || 0) + 1;
-              if (!blogsByAuthor[authorName]) blogsByAuthor[authorName] = [];
-              blogsByAuthor[authorName].push(entry);
-            });
-          }
-        });
-        const sortedAuthors = Object.entries(authorCounts)
-          .map(([name, count]) => ({name, count}))
-          .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
-        showModal('authors', sortedAuthors, blogsByAuthor);
+      // Filter entries by selected year
+      const blogEntries = filterEntriesByYear(allBlogEntries, selectedYear);
+      const authorCounts = {};
+      const blogsByAuthor = {};
+      blogEntries.forEach(entry => {
+        if (entry.author && entry.author.trim() !== '') {
+          // Split by comma, trim each author, and add the blog to each
+          entry.author.split(/,|\/|\band\b/gi).map(a => a.trim()).forEach(authorName => {
+            if (!authorName) return;
+            authorCounts[authorName] = (authorCounts[authorName] || 0) + 1;
+            if (!blogsByAuthor[authorName]) blogsByAuthor[authorName] = [];
+            blogsByAuthor[authorName].push(entry);
+          });
+        }
       });
+      const sortedAuthors = Object.entries(authorCounts)
+        .map(([name, count]) => ({name, count}))
+        .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+      showModal('authors', sortedAuthors, blogsByAuthor);
     };
 
     document.getElementById('show-websites').onclick = function(e) {
       e.preventDefault();
-      chrome.runtime.sendMessage({action: 'getBlogEntries'}, function(response) {
-        const blogEntries = response.blogEntries || [];
-        const websiteCounts = {};
-        const blogsByWebsite = {};
-        const websiteDisplayNames = {};
-        blogEntries.forEach(entry => {
-          if (entry.website && entry.website.trim() !== '') {
-            const key = entry.website.trim().toLowerCase();
-            websiteCounts[key] = (websiteCounts[key] || 0) + 1;
-            if (!blogsByWebsite[key]) blogsByWebsite[key] = [];
-            blogsByWebsite[key].push(entry);
-            // Store the display name (first encountered)
-            if (!websiteDisplayNames[key]) websiteDisplayNames[key] = entry.website.trim();
-          }
-        });
-        const sortedWebsites = Object.entries(websiteCounts)
-          .map(([key, count]) => ({name: websiteDisplayNames[key], count}))
-          .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
-        showModal('websites', sortedWebsites, blogsByWebsite);
+      // Filter entries by selected year
+      const blogEntries = filterEntriesByYear(allBlogEntries, selectedYear);
+      const websiteCounts = {};
+      const blogsByWebsite = {};
+      const websiteDisplayNames = {};
+      blogEntries.forEach(entry => {
+        if (entry.website && entry.website.trim() !== '') {
+          const key = entry.website.trim().toLowerCase();
+          websiteCounts[key] = (websiteCounts[key] || 0) + 1;
+          if (!blogsByWebsite[key]) blogsByWebsite[key] = [];
+          blogsByWebsite[key].push(entry);
+          // Store the display name (first encountered)
+          if (!websiteDisplayNames[key]) websiteDisplayNames[key] = entry.website.trim();
+        }
       });
+      const sortedWebsites = Object.entries(websiteCounts)
+        .map(([key, count]) => ({name: websiteDisplayNames[key], count}))
+        .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+      showModal('websites', sortedWebsites, blogsByWebsite);
     };
 
     document.getElementById('show-5star').onclick = function(e) {
       e.preventDefault();
-      chrome.runtime.sendMessage({action: 'getBlogEntries'}, function(response) {
-        const blogEntries = response.blogEntries || [];
-        const fiveStarArticles = blogEntries.filter(entry => entry.rating === 5);
-        
-        // Sort by date (most recent first)
-        fiveStarArticles.sort((a, b) => {
-          const dateA = a.date ? new Date(a.date) : new Date(0);
-          const dateB = b.date ? new Date(b.date) : new Date(0);
-          return dateB - dateA;
-        });
-        
-        // Create modal content
-        const modal = document.getElementById('5star-modal');
-        modal.innerHTML = `
-          <div class="modal-content">
-            <button class="modal-close" aria-label="Close">&times;</button>
-            <h2>5 Star Articles (${fiveStarArticles.length})</h2>
-            <div class="five-star-list">
-              ${fiveStarArticles.length > 0 ? 
-                fiveStarArticles.map(entry => {
-                  const date = entry.date ? new Date(entry.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'Unknown date';
-                  const author = entry.author ? `by ${entry.author}` : '';
-                  const website = entry.website ? `on ${entry.website}` : '';
-                  const info = [author, website].filter(Boolean).join(' ');
-                  return `
-                    <div class="five-star-entry">
-                      <a href="${entry.url || '#'}" class="five-star-title" target="_blank" rel="noopener">${entry.title || 'Untitled'}</a>
-                      <div class="five-star-info">${info}</div>
-                      <div class="five-star-date">${date}</div>
-                    </div>
-                  `;
-                }).join('') :
-                '<p>No 5-star articles yet. Keep reading!</p>'
-              }
-            </div>
-          </div>
-        `;
-        
-        // Close logic
-        modal.querySelector('.modal-close').onclick = () => { modal.style.display = 'none'; };
-        modal.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
-        modal.style.display = 'flex';
+      // Filter entries by selected year
+      const blogEntries = filterEntriesByYear(allBlogEntries, selectedYear);
+      const fiveStarArticles = blogEntries.filter(entry => entry.rating === 5);
+      
+      // Sort by date (most recent first)
+      fiveStarArticles.sort((a, b) => {
+        const dateA = a.date ? new Date(a.date) : new Date(0);
+        const dateB = b.date ? new Date(b.date) : new Date(0);
+        return dateB - dateA;
       });
+      
+      // Create modal content
+      const modal = document.getElementById('5star-modal');
+      modal.innerHTML = `
+        <div class="modal-content">
+          <button class="modal-close" aria-label="Close">&times;</button>
+          <h2>5 Star Articles (${fiveStarArticles.length})</h2>
+          <div class="five-star-list">
+            ${fiveStarArticles.length > 0 ? 
+              fiveStarArticles.map(entry => {
+                const date = entry.date ? new Date(entry.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'Unknown date';
+                const author = entry.author ? `by ${entry.author}` : '';
+                const website = entry.website ? `on ${entry.website}` : '';
+                const info = [author, website].filter(Boolean).join(' ');
+                return `
+                  <div class="five-star-entry">
+                    <a href="${entry.url || '#'}" class="five-star-title" target="_blank" rel="noopener">${entry.title || 'Untitled'}</a>
+                    <div class="five-star-info">${info}</div>
+                    <div class="five-star-date">${date}</div>
+                  </div>
+                `;
+              }).join('') :
+              '<p>No 5-star articles yet. Keep reading!</p>'
+            }
+          </div>
+        </div>
+      `;
+      
+      // Close logic
+      modal.querySelector('.modal-close').onclick = () => { modal.style.display = 'none'; };
+      modal.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
+      modal.style.display = 'flex';
     };
 
     // Backup functionality
