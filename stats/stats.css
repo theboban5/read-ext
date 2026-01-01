@@ -426,14 +426,21 @@ body {
     border-top: 1px solid #eee;
   }
 
-  .footer a {
+  .footer a,
+  .footer-link {
     color: #4285f4;
     text-decoration: none;
     font-size: 14px;
   }
 
-  .footer a:hover {
+  .footer a:hover,
+  .footer-link:hover {
     text-decoration: underline;
+  }
+  
+  .footer-separator {
+    margin: 0 10px;
+    color: #ccc;
   }
   
   .backup-controls {

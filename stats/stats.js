@@ -782,55 +782,118 @@ document.addEventListener('DOMContentLoaded', function() {
       modal.style.display = 'flex';
     };
 
-    // Backup functionality
-    document.getElementById('create-backup').onclick = function(e) {
-      e.preventDefault();
-      const btn = this;
-      btn.disabled = true;
-      btn.textContent = 'Creating Backup...';
-      
-      chrome.runtime.sendMessage({action: 'createBackup'}, function(response) {
-        btn.disabled = false;
-        btn.textContent = 'Create Backup';
+    // Backup functionality (only if elements exist)
+    const createBackupBtn = document.getElementById('create-backup');
+    if (createBackupBtn) {
+      createBackupBtn.onclick = function(e) {
+        e.preventDefault();
+        const btn = this;
+        btn.disabled = true;
+        btn.textContent = 'Creating Backup...';
         
-        if (response.success) {
-          alert('Backup created successfully! Check your Downloads folder.');
-        } else {
-          alert('Backup failed: ' + response.message);
-        }
-      });
-    };
-
-    document.getElementById('restore-backup').onclick = function(e) {
-      e.preventDefault();
-      document.getElementById('restore-file').click();
-    };
-
-    document.getElementById('restore-file').onchange = function(e) {
-      const file = e.target.files[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        const fileContent = e.target.result;
-        
-        if (confirm('This will replace all your current data. Are you sure you want to restore from backup?')) {
-          chrome.runtime.sendMessage({
-            action: 'restoreBackup',
-            fileContent: fileContent
-          }, function(response) {
-            if (response.success) {
-              alert('Backup restored successfully! The page will reload.');
-              window.location.reload();
-            } else {
-              alert('Restore failed: ' + response.message);
-            }
-          });
-        }
+        chrome.runtime.sendMessage({action: 'createBackup'}, function(response) {
+          btn.disabled = false;
+          btn.textContent = 'Create Backup';
+          
+          if (response.success) {
+            alert('Backup created successfully! Check your Downloads folder.');
+          } else {
+            alert('Backup failed: ' + response.message);
+          }
+        });
       };
-      reader.readAsText(file);
-      
-      // Reset the file input
-      e.target.value = '';
-    };
+    }
+
+    const restoreBackupBtn = document.getElementById('restore-backup');
+    if (restoreBackupBtn) {
+      restoreBackupBtn.onclick = function(e) {
+        e.preventDefault();
+        const restoreFile = document.getElementById('restore-file');
+        if (restoreFile) restoreFile.click();
+      };
+    }
+
+    const restoreFileInput = document.getElementById('restore-file');
+    if (restoreFileInput) {
+      restoreFileInput.onchange = function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const fileContent = e.target.result;
+          
+          if (confirm('This will replace all your current data. Are you sure you want to restore from backup?')) {
+            chrome.runtime.sendMessage({
+              action: 'restoreBackup',
+              fileContent: fileContent
+            }, function(response) {
+              if (response.success) {
+                alert('Backup restored successfully! The page will reload.');
+                window.location.reload();
+              } else {
+                alert('Restore failed: ' + response.message);
+              }
+            });
+          }
+        };
+        reader.readAsText(file);
+        
+        // Reset the file input
+        e.target.value = '';
+      };
+    }
+
+    // Export functionality - Simple JSON export (much easier than CSV)
+    const exportCsvBtn = document.getElementById('export-csv');
+    if (exportCsvBtn) {
+      exportCsvBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // Get all blog entries
+        const blogEntries = allBlogEntries;
+        
+        if (blogEntries.length === 0) {
+          alert('No entries to export.');
+          return false;
+        }
+        
+        // Create export data object
+        const exportData = {
+          version: '1.0',
+          exportDate: new Date().toISOString(),
+          totalEntries: blogEntries.length,
+          entries: blogEntries
+        };
+        
+        // Convert to JSON string
+        const jsonContent = JSON.stringify(exportData, null, 2);
+        
+        // Create blob
+        const blob = new Blob([jsonContent], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        
+        // Generate filename with current date
+        const today = new Date();
+        const dateStr = today.toISOString().split('T')[0]; // YYYY-MM-DD
+        const filename = `reading-stats-${dateStr}.json`;
+        
+        // Create download link and trigger download (simpler approach)
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        
+        // Clean up
+        setTimeout(() => {
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+        }, 100);
+        
+        return false;
+      });
+    }
   });
