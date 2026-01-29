@@ -291,157 +291,151 @@ document.addEventListener('DOMContentLoaded', function() {
         // Create Github-style activity graph
         activityGraphContainer.innerHTML = '';
         
+        // Align startDate to the previous Sunday (start of the week)
+        const graphStartDate = new Date(startDate);
+        const startDayOfWeek = graphStartDate.getDay();
+        graphStartDate.setDate(graphStartDate.getDate() - startDayOfWeek);
+        
+        // Align endDate to the next Saturday (end of the week)
+        const graphEndDate = new Date(endDate);
+        const endDayOfWeek = graphEndDate.getDay();
+        if (endDayOfWeek !== 6) {
+          graphEndDate.setDate(graphEndDate.getDate() + (6 - endDayOfWeek));
+        }
+        
+        // Calculate total weeks
+        const totalDays = Math.ceil((graphEndDate - graphStartDate) / (1000 * 60 * 60 * 24)) + 1;
+        const totalWeeks = Math.ceil(totalDays / 7);
+        
         // --- Add month labels row ---
         const monthLabelsDiv = document.createElement('div');
         monthLabelsDiv.className = 'month-labels';
-        monthLabelsDiv.style.display = 'flex';
-        monthLabelsDiv.style.marginLeft = '32px'; // align with graph
-        monthLabelsDiv.style.marginBottom = '2px';
-        monthLabelsDiv.style.height = '16px';
-        monthLabelsDiv.style.fontSize = '11px';
-        monthLabelsDiv.style.color = '#888';
         
-        // Calculate weeks and months
-        let months = [];
-        let lastMonth = null;
-        let d = new Date(startDate);
-        let endDateCopy = new Date(endDate);
-        let weekIndex = 0;
-        let firstDayOfWeek = d.getDay();
-        // Add empty label for alignment
-        if (firstDayOfWeek > 0) {
-          const emptyLabel = document.createElement('div');
-          emptyLabel.style.width = `${firstDayOfWeek * 16}px`;
-          emptyLabel.style.display = 'inline-block';
-          monthLabelsDiv.appendChild(emptyLabel);
-        }
-        while (d <= endDateCopy) {
-          const month = d.getMonth();
-          if (month !== lastMonth) {
-            // Add month label
-            const monthLabel = document.createElement('div');
-            monthLabel.textContent = d.toLocaleString('default', { month: 'short' });
-            monthLabel.style.width = '56px'; // 7 days * 8px width per cell
-            monthLabel.style.display = 'inline-block';
-            monthLabelsDiv.appendChild(monthLabel);
-            lastMonth = month;
-          } else {
-            // Add empty space for non-first week of month
-            const empty = document.createElement('div');
-            empty.style.width = '8px';
-            empty.style.display = 'inline-block';
-            monthLabelsDiv.appendChild(empty);
+        // Track month labels by week
+        let currentWeekDate = new Date(graphStartDate);
+        let lastMonthLabel = -1;
+        
+        for (let week = 0; week < totalWeeks; week++) {
+          const weekStartDate = new Date(graphStartDate);
+          weekStartDate.setDate(weekStartDate.getDate() + (week * 7));
+          
+          const monthLabel = document.createElement('div');
+          monthLabel.className = 'month-label';
+          
+          // Check if this week contains the 1st of a month, or is the first week
+          let showMonth = false;
+          for (let day = 0; day < 7; day++) {
+            const checkDate = new Date(weekStartDate);
+            checkDate.setDate(checkDate.getDate() + day);
+            if (checkDate.getDate() <= 7 && checkDate.getMonth() !== lastMonthLabel) {
+              monthLabel.textContent = checkDate.toLocaleString('default', { month: 'short' });
+              lastMonthLabel = checkDate.getMonth();
+              showMonth = true;
+              break;
+            }
           }
-          d.setDate(d.getDate() + 7 - d.getDay()); // jump to next week's first day
+          
+          monthLabelsDiv.appendChild(monthLabel);
         }
         activityGraphContainer.appendChild(monthLabelsDiv);
         // --- End month labels row ---
+        
+        // Create the graph wrapper with day labels and grid
+        const graphWrapper = document.createElement('div');
+        graphWrapper.className = 'graph-wrapper';
         
         // Create days of week labels
         const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
         const dayLabelsDiv = document.createElement('div');
         dayLabelsDiv.className = 'day-labels';
-        dayLabelsDiv.style.display = 'flex';
-        dayLabelsDiv.style.flexDirection = 'column';
-        dayLabelsDiv.style.marginRight = '5px';
         
-        // Add empty space for alignment
-        const emptyLabel = document.createElement('div');
-        emptyLabel.style.height = '18px';
-        dayLabelsDiv.appendChild(emptyLabel);
-        
-        // Add day labels
-        daysOfWeek.forEach(day => {
+        daysOfWeek.forEach((day, idx) => {
           const dayLabel = document.createElement('div');
-          dayLabel.style.height = '18px';
-          dayLabel.style.fontSize = '10px';
-          dayLabel.style.color = '#999';
-          dayLabel.textContent = day;
+          dayLabel.className = 'day-label';
+          // Only show every other label to save space (like GitHub)
+          dayLabel.textContent = (idx % 2 === 1) ? day : '';
           dayLabelsDiv.appendChild(dayLabel);
         });
         
-        const graphWrapper = document.createElement('div');
-        graphWrapper.style.display = 'flex';
-        
         graphWrapper.appendChild(dayLabelsDiv);
         
+        // Create the grid container
         const graphDiv = document.createElement('div');
-        graphDiv.style.display = 'flex';
-        graphDiv.style.flexWrap = 'wrap';
-        graphDiv.style.width = '100%';
+        graphDiv.className = 'activity-grid';
+        graphDiv.style.gridTemplateColumns = `repeat(${totalWeeks}, 1fr)`;
         
-        let currentDate = new Date(startDate);
-        const startDay = currentDate.getDay();
-        
-        // Add empty cells for alignment
-        for (let i = 0; i < startDay; i++) {
-          const emptyCell = document.createElement('div');
-          emptyCell.className = 'day-cell';
-          emptyCell.style.visibility = 'hidden';
-          graphDiv.appendChild(emptyCell);
-        }
-        
-        // Add day cells - show all days in the range (including empty days)
-        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-          const dateStr = formatDate(d);
-          const count = entriesByDate.get(dateStr) || 0;
-          const blogs = blogsByDate.get(dateStr) || [];
-          
-          const dayCell = document.createElement('div');
-          dayCell.className = 'day-cell';
-          dayCell.dataset.date = dateStr;
-          
-          // Add level class based on count
-          if (count > 0) {
-            const level = Math.min(Math.ceil(count * 4 / maxCount), 4);
-            dayCell.classList.add(`day-cell-level-${level}`);
-          }
-          
-          // Custom tooltip logic
-          dayCell.addEventListener('mouseenter', function(e) {
-            let tooltip = document.createElement('div');
-            tooltip.className = 'custom-tooltip';
-            tooltip.style.left = (e.clientX + 10) + 'px';
-            tooltip.style.top = (e.clientY + 10) + 'px';
-            // Add blog count next to date
-            tooltip.innerHTML = `<div class='tooltip-date'>${dateStr} <span style="color:#888;font-size:13px;">(${blogs.length} blog${blogs.length === 1 ? '' : 's'})</span></div>`;
-            if (blogs.length > 0) {
-              tooltip.innerHTML += `<ul class='tooltip-list'>` + blogs.map((entry, idx) => {
-                let title = entry.title || 'Untitled';
-                let author = entry.author ? ` <span class='tooltip-author'>&mdash; ${entry.author}</span>` : '';
-                let rating = entry.rating ? `<span class='tooltip-rating'>${'★'.repeat(entry.rating)}${'☆'.repeat(5 - entry.rating)}</span>` : '';
-                let url = entry.url || '#';
-                return `<li><a href='${url}' class='tooltip-link' target='_blank' rel='noopener'>${title}</a>${author} ${rating}</li>`;
-              }).join('') + `</ul>`;
-            } else {
-              tooltip.innerHTML += `<div class='tooltip-empty'>No blogs</div>`;
-            }
-            document.body.appendChild(tooltip);
-            dayCell._tooltip = tooltip;
+        // Add day cells - iterate by week (column) then by day (row)
+        for (let week = 0; week < totalWeeks; week++) {
+          for (let dayOfWeek = 0; dayOfWeek < 7; dayOfWeek++) {
+            const cellDate = new Date(graphStartDate);
+            cellDate.setDate(cellDate.getDate() + (week * 7) + dayOfWeek);
             
-            // Tooltip hover logic
-            let hideTimeout;
-            const removeTooltip = () => {
-              if (tooltip.parentNode) tooltip.parentNode.removeChild(tooltip);
-              dayCell._tooltip = null;
-            };
-            dayCell._hideTooltip = () => {
-              hideTimeout = setTimeout(removeTooltip, 100);
-            };
-            dayCell._clearHideTooltip = () => {
-              if (hideTimeout) clearTimeout(hideTimeout);
-            };
-            dayCell.addEventListener('mouseleave', dayCell._hideTooltip);
-            tooltip.addEventListener('mouseenter', dayCell._clearHideTooltip);
-            tooltip.addEventListener('mouseleave', dayCell._hideTooltip);
-          });
-          dayCell.addEventListener('mousemove', function(e) {
-            if (dayCell._tooltip) {
-              dayCell._tooltip.style.left = (e.clientX + 10) + 'px';
-              dayCell._tooltip.style.top = (e.clientY + 10) + 'px';
+            const dateStr = formatDate(cellDate);
+            const count = entriesByDate.get(dateStr) || 0;
+            const blogs = blogsByDate.get(dateStr) || [];
+            
+            const dayCell = document.createElement('div');
+            dayCell.className = 'day-cell';
+            dayCell.dataset.date = dateStr;
+            
+            // Hide cells outside the actual date range
+            if (cellDate < startDate || cellDate > endDate) {
+              dayCell.classList.add('day-cell-hidden');
+            } else {
+              // Add level class based on count
+              if (count > 0) {
+                const level = Math.min(Math.ceil(count * 4 / maxCount), 4);
+                dayCell.classList.add(`day-cell-level-${level}`);
+              }
+              
+              // Custom tooltip logic
+              dayCell.addEventListener('mouseenter', function(e) {
+                let tooltip = document.createElement('div');
+                tooltip.className = 'custom-tooltip';
+                tooltip.style.left = (e.clientX + 10) + 'px';
+                tooltip.style.top = (e.clientY + 10) + 'px';
+                // Add blog count next to date
+                tooltip.innerHTML = `<div class='tooltip-date'>${dateStr} <span style="color:#888;font-size:13px;">(${blogs.length} blog${blogs.length === 1 ? '' : 's'})</span></div>`;
+                if (blogs.length > 0) {
+                  tooltip.innerHTML += `<ul class='tooltip-list'>` + blogs.map((entry, idx) => {
+                    let title = entry.title || 'Untitled';
+                    let author = entry.author ? ` <span class='tooltip-author'>&mdash; ${entry.author}</span>` : '';
+                    let rating = entry.rating ? `<span class='tooltip-rating'>${'★'.repeat(entry.rating)}${'☆'.repeat(5 - entry.rating)}</span>` : '';
+                    let url = entry.url || '#';
+                    return `<li><a href='${url}' class='tooltip-link' target='_blank' rel='noopener'>${title}</a>${author} ${rating}</li>`;
+                  }).join('') + `</ul>`;
+                } else {
+                  tooltip.innerHTML += `<div class='tooltip-empty'>No blogs</div>`;
+                }
+                document.body.appendChild(tooltip);
+                dayCell._tooltip = tooltip;
+                
+                // Tooltip hover logic
+                let hideTimeout;
+                const removeTooltip = () => {
+                  if (tooltip.parentNode) tooltip.parentNode.removeChild(tooltip);
+                  dayCell._tooltip = null;
+                };
+                dayCell._hideTooltip = () => {
+                  hideTimeout = setTimeout(removeTooltip, 100);
+                };
+                dayCell._clearHideTooltip = () => {
+                  if (hideTimeout) clearTimeout(hideTimeout);
+                };
+                dayCell.addEventListener('mouseleave', dayCell._hideTooltip);
+                tooltip.addEventListener('mouseenter', dayCell._clearHideTooltip);
+                tooltip.addEventListener('mouseleave', dayCell._hideTooltip);
+              });
+              dayCell.addEventListener('mousemove', function(e) {
+                if (dayCell._tooltip) {
+                  dayCell._tooltip.style.left = (e.clientX + 10) + 'px';
+                  dayCell._tooltip.style.top = (e.clientY + 10) + 'px';
+                }
+              });
             }
-          });
-          graphDiv.appendChild(dayCell);
+            
+            graphDiv.appendChild(dayCell);
+          }
         }
         
         graphWrapper.appendChild(graphDiv);
