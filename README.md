@@ -66,17 +66,12 @@ All data is stored locally and synced across your Chrome devices.
 
 ## Storage & Backup
 
-This extension uses **Chrome Local Storage** for data persistence, which means:
-- ✅ Much higher storage limits (5-10MB vs 512KB)
-- ✅ No chunking headaches or quota issues
-- ✅ Data survives browser crashes and restarts
-- ✅ Automatic backups built into local storage
-- ✅ Manual export functionality for external backups
+This extension uses **Chrome Local Storage** as its single source of truth (~10MB, ~10,000+ articles). On first run after upgrading, any data left behind in `chrome.storage.sync` (including the older chunked layout) is merged into local automatically.
 
-### Storage Capacity
-- **Local Storage**: ~10,000+ articles (5-10MB limit)
-- **No chunking required** - all data in one place
-- **Automatic backups** stored in local storage
+### Automatic backups
+- **Every 100 new entries**: a JSON snapshot is downloaded to your Downloads folder automatically (filename: `blog-tracker-auto-backup-YYYY-MM-DD-<count>.json`).
+- **Monthly**: a JSON snapshot is downloaded on a 30-day cadence (`blog-tracker-monthly-backup-...json`).
+- **Manual**: trigger a backup any time from the Stats page.
 
 ### Data Export & Backup
 To create external backups of your data:

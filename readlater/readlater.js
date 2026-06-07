@@ -286,31 +286,29 @@ document.addEventListener('DOMContentLoaded', function() {
       date: new Date().toISOString()
     };
     
-    // Add to blog entries
-    chrome.storage.sync.get('blogEntries', function(data) {
-      let blogEntries = data.blogEntries || [];
-      
-      // Check if already exists
+    // Add to blog entries via background (single source of truth)
+    chrome.runtime.sendMessage({action: 'getBlogEntries'}, function(response) {
+      let blogEntries = (response && response.blogEntries) || [];
+
       const existingIndex = blogEntries.findIndex(item => item.url === blogEntry.url);
       if (existingIndex !== -1) {
         blogEntries[existingIndex] = blogEntry;
       } else {
         blogEntries.push(blogEntry);
       }
-      
-      // Save to storage and remove from read later
-      chrome.storage.sync.set({blogEntries: blogEntries}, function() {
+
+      chrome.runtime.sendMessage({action: 'saveBlogEntries', blogEntries: blogEntries}, function() {
         removeFromReadLater(entry.url);
       });
     });
   }
-  
+
   function removeFromReadLater(url) {
-    chrome.storage.sync.get('toReadEntries', function(data) {
-      let toReadEntries = data.toReadEntries || [];
+    chrome.runtime.sendMessage({action: 'getToReadEntries'}, function(response) {
+      const toReadEntries = (response && response.toReadEntries) || [];
       const newList = toReadEntries.filter(entry => entry.url !== url);
-      
-      chrome.storage.sync.set({toReadEntries: newList}, function() {
+
+      chrome.runtime.sendMessage({action: 'saveToReadEntries', toReadEntries: newList}, function() {
         updateEntriesList();
       });
     });
