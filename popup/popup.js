@@ -97,19 +97,18 @@ document.addEventListener('DOMContentLoaded', function() {
         // Check if this URL already exists
         const existingIndex = blogEntries.findIndex(entry => entry.url === blogEntry.url);
         
-        if (existingIndex !== -1) {
+        const isUpdate = existingIndex !== -1;
+        if (isUpdate) {
           // Update existing entry
           blogEntries[existingIndex] = blogEntry;
-          showMessage('Blog updated!', 'success');
         } else {
           // Add new entry
           blogEntries.push(blogEntry);
-          showMessage('Blog saved!', 'success');
         }
-        
+
         console.log('Saving blog entries:', blogEntries.length);
         // Save to storage using background script
-        saveBlogEntries(blogEntries);
+        saveBlogEntries(blogEntries, isUpdate ? 'Blog updated!' : 'Blog saved!');
       });
     });
   
@@ -147,8 +146,7 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
           // Add new entry
           toReadEntries.push(toReadEntry);
-          showMessage('Added to read later!', 'success');
-          
+
           // Save to storage using background script
           saveToReadEntries(toReadEntries);
         }
@@ -158,10 +156,14 @@ document.addEventListener('DOMContentLoaded', function() {
     // Randomizer functionality
     randomizer.addEventListener('click', function(e) {
       e.preventDefault();
-      
+
       // Get the read later list using the background script
       chrome.runtime.sendMessage({action: 'getToReadEntries'}, function(response) {
-        const toReadEntries = response.toReadEntries || [];
+        if (chrome.runtime.lastError) {
+          showMessage('Error accessing read later list', 'error');
+          return;
+        }
+        const toReadEntries = (response && response.toReadEntries) || [];
         
         if (toReadEntries.length === 0) {
           showMessage('No articles in your read later list!', 'info');
@@ -194,13 +196,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Helper function to save blog entries
-    function saveBlogEntries(blogEntries) {
+    function saveBlogEntries(blogEntries, successMessage) {
       if (!blogEntries || !Array.isArray(blogEntries)) {
         console.error('Invalid blog entries data:', blogEntries);
         showMessage('Error: Invalid data', 'error');
         return;
       }
-      
+
       console.log('Sending saveBlogEntries message with', blogEntries.length, 'entries');
       chrome.runtime.sendMessage({
         action: 'saveBlogEntries',
@@ -211,12 +213,10 @@ document.addEventListener('DOMContentLoaded', function() {
           showMessage('Error saving blog entry: ' + chrome.runtime.lastError.message, 'error');
           return;
         }
-        
+
         if (response && response.success) {
           console.log('Blog entries saved successfully');
-          if (response.message) {
-            showMessage(response.message, 'success');
-          }
+          showMessage(successMessage || 'Blog saved!', 'success');
           setTimeout(function() {
             window.close();
           }, 1500);
@@ -234,7 +234,7 @@ document.addEventListener('DOMContentLoaded', function() {
         showMessage('Error: Invalid data', 'error');
         return;
       }
-      
+
       chrome.runtime.sendMessage({
         action: 'saveToReadEntries',
         toReadEntries: toReadEntries
@@ -244,8 +244,9 @@ document.addEventListener('DOMContentLoaded', function() {
           showMessage('Error saving to read entry: ' + chrome.runtime.lastError.message, 'error');
           return;
         }
-        
+
         if (response && response.success) {
+          showMessage('Added to read later!', 'success');
           setTimeout(function() {
             window.close();
           }, 1500);

@@ -23,7 +23,12 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function loadBlogEntries() {
       chrome.runtime.sendMessage({action: 'getBlogEntries'}, function(response) {
-        allBlogEntries = response.blogEntries || [];
+        if (chrome.runtime.lastError) {
+          console.error('Error loading blog entries:', chrome.runtime.lastError);
+          entriesListElement.innerHTML = '<p>Error loading entries. Please try again.</p>';
+          return;
+        }
+        allBlogEntries = (response && response.blogEntries) || [];
         
         if (allBlogEntries.length === 0) {
           entriesListElement.innerHTML = '<p>No blog entries yet. Start tracking your reading!</p>';
@@ -448,7 +453,11 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function updateEntriesList() {
       chrome.runtime.sendMessage({action: 'getBlogEntries'}, function(response) {
-        let blogEntries = response.blogEntries || [];
+        if (chrome.runtime.lastError) {
+          console.error('Error updating entries list:', chrome.runtime.lastError);
+          return;
+        }
+        let blogEntries = (response && response.blogEntries) || [];
         
         // Apply search filter
         const searchTerm = searchInput.value.toLowerCase().trim();

@@ -18,16 +18,21 @@ document.addEventListener('DOMContentLoaded', function() {
   
   function loadToReadEntries() {
     chrome.runtime.sendMessage({action: 'getToReadEntries'}, function(response) {
-      const toReadEntries = response.toReadEntries || [];
-      
+      if (chrome.runtime.lastError) {
+        console.error('Error loading to-read entries:', chrome.runtime.lastError);
+        entriesListElement.innerHTML = '<p>Error loading entries. Please try again.</p>';
+        return;
+      }
+      const toReadEntries = (response && response.toReadEntries) || [];
+
       if (toReadEntries.length === 0) {
         entriesListElement.innerHTML = '<p>No articles in your read later list yet!</p>';
         return;
       }
-      
+
       // Update stats summary
       updateStatsSummary(toReadEntries);
-      
+
       // Initialize entries list
       updateEntriesList();
     });
@@ -56,12 +61,14 @@ document.addEventListener('DOMContentLoaded', function() {
     Promise.all([
       new Promise(resolve => {
         chrome.runtime.sendMessage({action: 'getToReadEntries'}, function(response) {
-          resolve(response.toReadEntries || []);
+          if (chrome.runtime.lastError) { console.error(chrome.runtime.lastError); }
+          resolve((response && response.toReadEntries) || []);
         });
       }),
       new Promise(resolve => {
         chrome.runtime.sendMessage({action: 'getBlogEntries'}, function(response) {
-          resolve(response.blogEntries || []);
+          if (chrome.runtime.lastError) { console.error(chrome.runtime.lastError); }
+          resolve((response && response.blogEntries) || []);
         });
       })
     ]).then(([toReadEntries, blogEntries]) => {
@@ -162,7 +169,11 @@ document.addEventListener('DOMContentLoaded', function() {
   
   function updateEntriesList() {
     chrome.runtime.sendMessage({action: 'getToReadEntries'}, function(response) {
-      let toReadEntries = response.toReadEntries || [];
+      if (chrome.runtime.lastError) {
+        console.error('Error updating entries list:', chrome.runtime.lastError);
+        return;
+      }
+      let toReadEntries = (response && response.toReadEntries) || [];
       
       // Apply search filter
       const searchTerm = searchInput.value.toLowerCase().trim();
@@ -288,6 +299,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Add to blog entries via background (single source of truth)
     chrome.runtime.sendMessage({action: 'getBlogEntries'}, function(response) {
+      if (chrome.runtime.lastError) { console.error(chrome.runtime.lastError); return; }
       let blogEntries = (response && response.blogEntries) || [];
 
       const existingIndex = blogEntries.findIndex(item => item.url === blogEntry.url);
@@ -305,6 +317,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   function removeFromReadLater(url) {
     chrome.runtime.sendMessage({action: 'getToReadEntries'}, function(response) {
+      if (chrome.runtime.lastError) { console.error(chrome.runtime.lastError); return; }
       const toReadEntries = (response && response.toReadEntries) || [];
       const newList = toReadEntries.filter(entry => entry.url !== url);
 
