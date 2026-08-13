@@ -1,0 +1,12 @@
+node_modules/
+.DS_Store
+
+# Never commit these -- this repo is public.
+#   .sync-token      the bearer token for the sync worker
+#   .dev.vars        wrangler's local secrets
+#   .shortcut-link   the iCloud Shortcut URL: the shortcut embeds the token in an
+#                    Authorization header, so sharing the link shares the credential
+.sync-token
+.dev.vars
+.shortcut-link
+*.local

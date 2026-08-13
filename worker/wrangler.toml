@@ -1,0 +1,45 @@
+# Safe to commit publicly: database_id is an identifier, not a credential -- it does
+# nothing without your Cloudflare account auth. The real secrets (SYNC_TOKEN, and
+# optionally CAPTURE_TOKEN) live in `wrangler secret put`, never in this file.
+
+name = "blog-sync"
+main = "src/index.js"
+compatibility_date = "2025-05-01"
+
+# Lets `import MOBILE_HTML from './mobile.html'` work -- the phone page ships inside
+# the worker bundle rather than as a separate asset.
+[[rules]]
+type = "Text"
+globs = ["**/*.html"]
+fallthrough = true
+
+[observability]
+enabled = true
+
+# Every deployed version otherwise gets its own public *.workers.dev hostname, each
+# serving this API. Auth still applies, but there is no reason for a personal
+# single-user service to have more public endpoints than the one you use.
+preview_urls = false
+
+# `binding` is the variable name the Worker code uses (env.DB), not a Cloudflare-side
+# name -- ignore the binding Cloudflare suggests in its create output. Both
+# environments bind to DB so src/index.js is identical for staging and production.
+[[d1_databases]]
+binding = "DB"
+database_name = "blog-sync"
+database_id = "ed288a95-0418-4b88-937d-602e8dc833ca"
+migrations_dir = "migrations"
+
+# Staging exists so Phase 2 (the extension migration) is never tested against real data.
+[env.staging]
+name = "blog-sync-staging"
+
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "blog-sync-staging"
+database_id = "a11aa12d-523c-417b-9c08-8373f93734ea"
+migrations_dir = "migrations"
+
+# SYNC_TOKEN (and optional CAPTURE_TOKEN) are secrets, not vars:
+#   wrangler secret put SYNC_TOKEN
+#   wrangler secret put SYNC_TOKEN --env staging

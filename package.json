@@ -1,0 +1,6 @@
+{
+  "name": "read-ext",
+  "private": true,
+  "type": "module",
+  "description": "Chrome extension source. This file exists so Node treats background/*.js as ESM when the worker tests import background/urlkey.js; Chrome ignores it."
+}

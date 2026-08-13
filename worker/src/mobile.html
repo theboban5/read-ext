@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Reading</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Reading">
+<meta name="theme-color" content="#ffffff">
+<link rel="manifest" href="/manifest.webmanifest">
+<style>
+:root {
+  --bg: #ffffff; --surface: #f6f6f7; --line: #e3e3e6;
+  --text: #16171a; --muted: #6c7076; --accent: #2f6df6; --star: #f0a92a;
+  --danger: #d0342c; --ok: #1a7f43;
+  --safe-b: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #131417; --surface: #1d1f23; --line: #2c2f35;
+    --text: #ecedef; --muted: #9aa0a8; --accent: #6f9bff; --star: #ffbf47;
+    --danger: #ff6b60; --ok: #4ade80;
+  }
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--bg); color: var(--text);
+  font: 16px/1.45 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  padding-bottom: calc(64px + var(--safe-b));
+  overscroll-behavior-y: contain;
+}
+h1 { font-size: 19px; margin: 0; }
+button, input, select { font: inherit; color: inherit; }
+button { background: none; border: none; cursor: pointer; }
+
+header {
+  position: sticky; top: 0; z-index: 5; background: var(--bg);
+  border-bottom: 1px solid var(--line);
+  padding: max(12px, env(safe-area-inset-top)) 16px 10px;
+  display: flex; align-items: center; gap: 12px;
+}
+header .count { color: var(--muted); font-size: 13px; margin-left: auto; }
+
+main { padding: 8px 12px 12px; }
+
+/* ---- rows ---- */
+.row {
+  border-bottom: 1px solid var(--line); padding: 12px 4px;
+  display: flex; gap: 10px; align-items: flex-start;
+}
+.row.sel { background: var(--surface); }
+.row .body { flex: 1; min-width: 0; }
+.row a.t {
+  color: var(--text); text-decoration: none; font-weight: 500;
+  display: block; overflow-wrap: anywhere;
+}
+.row a.t:active { color: var(--accent); }
+.row .meta { color: var(--muted); font-size: 13px; margin-top: 2px; }
+.row .chev {
+  color: var(--muted); font-size: 20px; padding: 0 4px; line-height: 1.2;
+  flex: 0 0 auto; min-height: 44px;
+}
+.tick {
+  flex: 0 0 auto; width: 24px; height: 24px; margin-top: 2px; border-radius: 50%;
+  border: 2px solid var(--line); display: grid; place-items: center;
+  font-size: 14px; color: transparent;
+}
+.tick.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* ---- stars ---- */
+.stars { display: flex; gap: 2px; align-items: center; }
+.stars button {
+  font-size: 27px; line-height: 1; color: var(--line);
+  padding: 6px 3px; min-width: 38px; min-height: 44px;
+}
+.stars button.on { color: var(--star); }
+.stars.sm button { font-size: 17px; min-width: 22px; min-height: 24px; padding: 0 1px; }
+
+.actions { display: flex; gap: 8px; align-items: center; padding: 10px 0 2px; flex-wrap: wrap; }
+.actions .sp { flex: 1; }
+.pill {
+  border: 1px solid var(--line); border-radius: 999px; padding: 8px 14px;
+  font-size: 14px; background: var(--surface); min-height: 40px;
+}
+.pill.danger { color: var(--danger); }
+.pill.go { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* ---- tab bar ---- */
+nav {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+  background: var(--bg); border-top: 1px solid var(--line);
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  padding-bottom: var(--safe-b);
+}
+nav button {
+  padding: 11px 0 9px; font-size: 11px; color: var(--muted);
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+}
+nav button .ic { font-size: 19px; line-height: 1; }
+nav button.on { color: var(--accent); }
+
+/* ---- batch bar ---- */
+#batch {
+  position: fixed; left: 0; right: 0; bottom: calc(60px + var(--safe-b)); z-index: 11;
+  background: var(--surface); border-top: 1px solid var(--line);
+  padding: 8px 12px; display: none; align-items: center; gap: 8px;
+}
+#batch.on { display: flex; }
+
+/* ---- misc ---- */
+.empty { color: var(--muted); text-align: center; padding: 48px 20px; }
+.field { margin-bottom: 14px; }
+.field label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 5px; }
+.field input {
+  width: 100%; padding: 11px 12px; border: 1px solid var(--line);
+  border-radius: 9px; background: var(--surface);
+}
+.seg { display: flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+.seg button { flex: 1; padding: 11px 0; font-size: 14px; color: var(--muted); }
+.seg button.on { background: var(--accent); color: #fff; }
+#toast {
+  position: fixed; left: 12px; right: 12px; bottom: calc(72px + var(--safe-b)); z-index: 20;
+  background: var(--text); color: var(--bg); border-radius: 10px;
+  padding: 12px 14px; display: none; align-items: center; gap: 12px; font-size: 14px;
+}
+#toast.on { display: flex; }
+#toast button { color: var(--bg); font-weight: 600; text-decoration: underline; margin-left: auto; }
+#gate { padding: 60px 24px; max-width: 380px; margin: 0 auto; }
+#gate p { color: var(--muted); font-size: 14px; }
+.err { color: var(--danger); font-size: 14px; min-height: 20px; }
+</style>
+</head>
+<body>
+
+<div id="gate" hidden>
+  <h1>Reading</h1>
+  <p>Enter the sync token to connect this phone to your reading list.</p>
+  <div class="field">
+    <label for="tok">Sync token</label>
+    <input type="password" id="tok" autocomplete="current-password" autocapitalize="off" spellcheck="false">
+  </div>
+  <button class="pill go" id="gate-go" style="width:100%">Connect</button>
+  <p class="err" id="gate-err"></p>
+</div>
+
+<div id="app" hidden>
+  <header>
+    <h1 id="title">Queue</h1>
+    <span class="count" id="count"></span>
+    <button class="pill" id="select-btn" style="padding:6px 12px;min-height:34px">Select</button>
+  </header>
+
+  <main id="view"></main>
+
+  <div id="batch">
+    <span id="batch-n" style="font-size:14px;color:var(--muted)"></span>
+    <div class="stars sm" id="batch-stars"></div>
+    <button class="pill" data-r="0">read</button>
+    <button class="pill danger" id="batch-del">delete</button>
+  </div>
+
+  <div id="toast"><span id="toast-msg"></span><button id="toast-undo">Undo</button></div>
+
+  <nav>
+    <button data-tab="queue" class="on"><span class="ic">&#9776;</span>Queue</button>
+    <button data-tab="recent"><span class="ic">&#10003;</span>Recent</button>
+    <button data-tab="add"><span class="ic">&#43;</span>Add</button>
+  </nav>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (s) { return document.querySelector(s); };
+  var TOKEN = null, TAB = 'queue', ITEMS = [], SELECT = false, SEL = new Set(), UNDO = null, TOASTT = null;
+
+  // ---------- api ----------
+  function api(path, opts) {
+    opts = opts || {};
+    var init = { method: opts.method || 'GET', headers: { Authorization: 'Bearer ' + TOKEN } };
+    if (opts.body) {
+      init.headers['Content-Type'] = 'application/json';
+      init.body = JSON.stringify(opts.body);
+    }
+    return fetch(path, init).then(function (r) {
+      if (r.status === 401) { logout('Token rejected.'); throw new Error('unauthorized'); }
+      if (!r.ok) throw new Error('Server error ' + r.status);
+      return r.json();
+    });
+  }
+
+  function logout(msg) {
+    try { localStorage.removeItem('blogSyncToken'); } catch (e) {}
+    TOKEN = null;
+    $('#app').hidden = true;
+    $('#gate').hidden = false;
+    $('#gate-err').textContent = msg || '';
+  }
+
+  // ---------- gate ----------
+  function connect(tok) {
+    $('#gate-err').textContent = '';
+    return fetch('/api/health', { headers: { Authorization: 'Bearer ' + tok } })
+      .then(function (r) {
+        if (r.status === 401) throw new Error('That token was rejected.');
+        if (!r.ok) throw new Error('Server returned ' + r.status + '.');
+        return r.json();
+      })
+      .then(function () {
+        TOKEN = tok;
+        try { localStorage.setItem('blogSyncToken', tok); } catch (e) {}
+        $('#gate').hidden = true;
+        $('#app').hidden = false;
+        return load();
+      })
+      .catch(function (e) { $('#gate-err').textContent = e.message; });
+  }
+
+  $('#gate-go').onclick = function () {
+    var v = $('#tok').value.trim();
+    if (v) connect(v);
+  };
+  $('#tok').onkeydown = function (e) { if (e.key === 'Enter') $('#gate-go').click(); };
+
+  // ---------- tabs ----------
+  Array.prototype.forEach.call(document.querySelectorAll('nav button'), function (b) {
+    b.onclick = function () {
+      TAB = b.dataset.tab;
+      Array.prototype.forEach.call(document.querySelectorAll('nav button'), function (x) {
+        x.classList.toggle('on', x === b);
+      });
+      $('#title').textContent = { queue: 'Queue', recent: 'Recent', add: 'Add' }[TAB];
+      $('#select-btn').style.display = TAB === 'add' ? 'none' : '';
+      exitSelect();
+      load();
+    };
+  });
+
+  $('#select-btn').onclick = function () {
+    SELECT = !SELECT;
+    if (!SELECT) SEL.clear();
+    $('#select-btn').textContent = SELECT ? 'Done' : 'Select';
+    render();
+  };
+  function exitSelect() { SELECT = false; SEL.clear(); $('#select-btn').textContent = 'Select'; syncBatch(); }
+
+  // ---------- load ----------
+  function load() {
+    if (TAB === 'add') { ITEMS = []; renderAdd(); return Promise.resolve(); }
+    $('#view').innerHTML = '<p class="empty">Loading&hellip;</p>';
+    var q = TAB === 'queue'
+      ? '/api/list?status=toread&order=saved_desc&limit=300'
+      : '/api/list?status=read&order=read_desc&limit=100';
+    return api(q).then(function (r) {
+      ITEMS = r.items || [];
+      render();
+    }).catch(function (e) {
+      $('#view').innerHTML = '<p class="empty">' + esc(e.message) + '</p>';
+    });
+  }
+
+  // ---------- render ----------
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+
+  function ago(ms) {
+    if (!ms) return '';
+    var d = Math.floor((Date.now() - ms) / 86400000);
+    if (d <= 0) return 'today';
+    if (d === 1) return 'yesterday';
+    if (d < 30) return d + 'd ago';
+    if (d < 365) return Math.round(d / 30) + 'mo ago';
+    return Math.round(d / 365) + 'y ago';
+  }
+
+  function render() {
+    if (TAB === 'add') return renderAdd();
+    $('#count').textContent = ITEMS.length ? ITEMS.length + '' : '';
+
+    if (!ITEMS.length) {
+      $('#view').innerHTML = '<p class="empty">' +
+        (TAB === 'queue' ? 'Nothing queued. Share a link from Safari to add one.' : 'Nothing read yet.') +
+        '</p>';
+      return;
+    }
+
+    var html = ITEMS.map(function (it, i) {
+      var when = TAB === 'queue' ? ago(it.saved_at || it.created_at) : ago(it.last_read_at);
+      var meta = [esc(it.website || ''), when].filter(Boolean).join(' &middot; ');
+      if (TAB === 'recent' && it.read_count > 1) meta += ' &middot; read ' + it.read_count + '&times;';
+      var stars = TAB === 'recent' && it.rating > 0
+        ? ' &middot; <span style="color:var(--star)">' + '★'.repeat(it.rating) + '</span>'
+        : '';
+      return '<div class="row' + (SEL.has(it.url_key) ? ' sel' : '') + '" data-i="' + i + '">' +
+        (SELECT ? '<div class="tick' + (SEL.has(it.url_key) ? ' on' : '') + '" data-tick="1">✓</div>' : '') +
+        '<div class="body">' +
+          '<a class="t" href="' + esc(it.url) + '" target="_blank" rel="noopener">' +
+            esc(it.title || it.url) + '</a>' +
+          '<div class="meta">' + meta + stars + '</div>' +
+        '</div>' +
+        (SELECT ? '' : '<button class="chev" data-x="1">&hellip;</button>') +
+      '</div>';
+    }).join('');
+
+    $('#view').innerHTML = html;
+
+    Array.prototype.forEach.call($('#view').querySelectorAll('.row'), function (row) {
+      var it = ITEMS[+row.dataset.i];
+      row.onclick = function (e) {
+        // In select mode the whole row is a checkbox, title included -- otherwise
+        // trying to tick something navigates away from the list instead.
+        if (SELECT) {
+          e.preventDefault();
+          if (SEL.has(it.url_key)) SEL.delete(it.url_key); else SEL.add(it.url_key);
+          render(); syncBatch();
+          return;
+        }
+        if (e.target.closest('a.t')) return;
+        if (e.target.closest('[data-x]')) expand(row, it);
+      };
+    });
+  }
+
+  function expand(row, it) {
+    var open = row.nextElementSibling;
+    if (open && open.classList.contains('actions-wrap')) { open.remove(); return; }
+    Array.prototype.forEach.call($('#view').querySelectorAll('.actions-wrap'), function (n) { n.remove(); });
+
+    var wrap = document.createElement('div');
+    wrap.className = 'actions-wrap';
+    wrap.innerHTML =
+      '<div class="actions" style="border-bottom:1px solid var(--line);padding-bottom:12px">' +
+        '<div class="stars"></div><span class="sp"></span>' +
+        (TAB === 'queue' ? '<button class="pill" data-r="0">read</button>' : '') +
+        '<button class="pill danger" data-del="1">delete</button>' +
+      '</div>';
+    row.after(wrap);
+
+    var starsEl = wrap.querySelector('.stars');
+    var current = TAB === 'recent' ? (it.rating || 0) : 0;
+    for (var v = 1; v <= 5; v++) {
+      (function (v) {
+        var b = document.createElement('button');
+        b.textContent = '★';
+        b.className = v <= current ? 'on' : '';
+        b.onclick = function () { rate([it], v); };
+        starsEl.appendChild(b);
+      })(v);
+    }
+    var zero = wrap.querySelector('[data-r]');
+    if (zero) zero.onclick = function () { rate([it], 0); };
+    wrap.querySelector('[data-del]').onclick = function () { del([it]); };
+  }
+
+  function renderAdd() {
+    $('#count').textContent = '';
+    $('#view').innerHTML =
+      '<div class="field"><label for="a-url">Link</label>' +
+        '<input id="a-url" type="url" inputmode="url" autocapitalize="off" autocorrect="off" ' +
+        'spellcheck="false" placeholder="https://"></div>' +
+      '<div class="field"><label for="a-title">Title <span style="opacity:.6">(optional)</span></label>' +
+        '<input id="a-title" type="text" placeholder="filled in automatically"></div>' +
+      '<div class="field"><label>Status</label>' +
+        '<div class="seg"><button id="a-read" class="on">Read</button>' +
+        '<button id="a-later">Read later</button></div></div>' +
+      '<div class="field" id="a-rate"><label>Rating</label><div class="stars"></div></div>' +
+      '<button class="pill go" id="a-save" style="width:100%;justify-content:center">Save</button>' +
+      '<p class="err" id="a-err"></p>';
+
+    var status = 'read', rating = 0;
+    var starsEl = $('#a-rate .stars');
+    function paint() {
+      Array.prototype.forEach.call(starsEl.children, function (b, i) {
+        b.classList.toggle('on', i < rating);
+      });
+    }
+    for (var v = 1; v <= 5; v++) {
+      (function (v) {
+        var b = document.createElement('button');
+        b.textContent = '★';
+        b.onclick = function () { rating = (rating === v ? 0 : v); paint(); };
+        starsEl.appendChild(b);
+      })(v);
+    }
+    $('#a-read').onclick = function () {
+      status = 'read'; this.classList.add('on'); $('#a-later').classList.remove('on');
+      $('#a-rate').style.display = '';
+    };
+    $('#a-later').onclick = function () {
+      status = 'toread'; this.classList.add('on'); $('#a-read').classList.remove('on');
+      $('#a-rate').style.display = 'none'; rating = 0; paint();
+    };
+    $('#a-save').onclick = function () {
+      var url = $('#a-url').value.trim();
+      if (!url) { $('#a-err').textContent = 'Paste a link first.'; return; }
+      var btn = this; btn.disabled = true; btn.textContent = 'Saving…';
+      api('/api/capture', {
+        method: 'POST',
+        body: { url: url, title: $('#a-title').value.trim() || undefined, status: status, rating: rating, source: 'web' }
+      }).then(function (r) {
+        btn.disabled = false; btn.textContent = 'Save';
+        if (!r.ok) { $('#a-err').textContent = r.message || 'Could not save that link.'; return; }
+        $('#a-url').value = ''; $('#a-title').value = ''; rating = 0; paint();
+        toast(r.message, null);
+      }).catch(function (e) {
+        btn.disabled = false; btn.textContent = 'Save';
+        $('#a-err').textContent = e.message;
+      });
+    };
+  }
+
+  // ---------- mutations ----------
+  function rate(items, value) {
+    var payload = items.map(function (it) {
+      return { url_key: it.url_key, read_id: TAB === 'recent' ? it.read_id : undefined, rating: value };
+    });
+    var removed = items.slice();
+    // Optimistic: the row leaves the queue immediately, with 5s to take it back.
+    if (TAB === 'queue') {
+      ITEMS = ITEMS.filter(function (x) { return items.indexOf(x) === -1; });
+      render();
+    }
+    exitSelect();
+
+    api('/api/rate', { method: 'POST', body: { items: payload } })
+      .then(function () {
+        if (TAB === 'recent') load();
+        toast(
+          removed.length + (removed.length === 1 ? ' article' : ' articles') +
+            (value ? ' rated ' + '★'.repeat(value) : ' marked read'),
+          function () { requeue(removed); }
+        );
+      })
+      .catch(function (e) { toast(e.message, null); load(); });
+  }
+
+  function requeue(items) {
+    api('/api/push', {
+      method: 'POST',
+      body: {
+        mode: 'merge',
+        entries: items.map(function (it) {
+          return { url: it.url, url_key: it.url_key, status: 'toread', force: true };
+        })
+      }
+    }).then(load);
+  }
+
+  function del(items) {
+    if (!confirm('Delete ' + (items.length === 1 ? 'this article' : items.length + ' articles') + '?')) return;
+    ITEMS = ITEMS.filter(function (x) { return items.indexOf(x) === -1; });
+    render();
+    exitSelect();
+    api('/api/delete', { method: 'POST', body: { url_keys: items.map(function (i) { return i.url_key; }) } })
+      .then(function () { toast('Deleted', null); })
+      .catch(function (e) { toast(e.message, null); load(); });
+  }
+
+  // ---------- batch bar ----------
+  (function buildBatch() {
+    var el = $('#batch-stars');
+    for (var v = 1; v <= 5; v++) {
+      (function (v) {
+        var b = document.createElement('button');
+        b.textContent = '★';
+        b.onclick = function () { rate(selected(), v); };
+        el.appendChild(b);
+      })(v);
+    }
+    $('#batch').querySelector('[data-r]').onclick = function () { rate(selected(), 0); };
+    $('#batch-del').onclick = function () { del(selected()); };
+  })();
+
+  function selected() {
+    return ITEMS.filter(function (it) { return SEL.has(it.url_key); });
+  }
+
+  function syncBatch() {
+    $('#batch').classList.toggle('on', SELECT && SEL.size > 0);
+    $('#batch-n').textContent = SEL.size + ' selected';
+  }
+
+  // ---------- toast ----------
+  function toast(msg, undo) {
+    clearTimeout(TOASTT);
+    $('#toast-msg').textContent = msg;
+    $('#toast-undo').style.display = undo ? '' : 'none';
+    UNDO = undo;
+    $('#toast').classList.add('on');
+    TOASTT = setTimeout(function () { $('#toast').classList.remove('on'); UNDO = null; }, 5000);
+  }
+  $('#toast-undo').onclick = function () {
+    var fn = UNDO; UNDO = null;
+    $('#toast').classList.remove('on');
+    if (fn) fn();
+  };
+
+  // ---------- boot ----------
+  var saved = null;
+  try { saved = localStorage.getItem('blogSyncToken'); } catch (e) {}
+  if (saved) { TOKEN = saved; $('#app').hidden = false; load(); }
+  else { $('#gate').hidden = false; }
+})();
+</script>
+</body>
+</html>

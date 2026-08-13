@@ -1,0 +1,18 @@
+{
+  "name": "blog-sync",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test \"test/*.test.mjs\"",
+    "test:integration": "node test/integration.mjs",
+    "dev": "wrangler dev",
+    "deploy": "npm test && wrangler deploy",
+    "deploy:staging": "npm test && wrangler deploy --env staging",
+    "migrate:local": "wrangler d1 migrations apply blog-sync --local",
+    "migrate:staging": "wrangler d1 migrations apply blog-sync-staging --remote",
+    "migrate:prod": "wrangler d1 migrations apply blog-sync --remote"
+  },
+  "devDependencies": {
+    "wrangler": "^4"
+  }
+}
