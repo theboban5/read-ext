@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Blog Tracker — Sync</title>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" type="text/css" href="options.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Sync</h1>
+    <p class="lede">
+      Point the extension at your Cloudflare worker so reading you capture on your
+      phone shows up here, and vice versa.
+    </p>
+
+    <section class="card">
+      <h2>Connection</h2>
+      <div class="form-group">
+        <label for="base-url">Worker URL</label>
+        <input type="url" id="base-url" placeholder="https://blog-sync.your-name.workers.dev" spellcheck="false">
+      </div>
+      <div class="form-group">
+        <label for="token">Sync token</label>
+        <input type="password" id="token" placeholder="the SYNC_TOKEN secret" spellcheck="false">
+      </div>
+      <div class="button-row">
+        <button id="test-btn">Test connection</button>
+        <button id="save-btn" disabled>Save</button>
+      </div>
+      <div id="test-result" class="result"></div>
+    </section>
+
+    <section class="card" id="migrate-card">
+      <h2>First-time migration</h2>
+      <p class="hint">
+        Uploads everything already stored in this browser. A backup downloads first,
+        and nothing local is deleted until the counts check out.
+      </p>
+      <div class="button-row">
+        <button id="preview-btn" disabled>Preview</button>
+        <button id="migrate-btn" disabled class="primary">Connect &amp; migrate</button>
+      </div>
+      <div id="migrate-result" class="result"></div>
+    </section>
+
+    <section class="card">
+      <h2>Status</h2>
+      <table class="status-table">
+        <tr><th>Configured</th><td id="s-configured">—</td></tr>
+        <tr><th>Migrated</th><td id="s-migrated">—</td></tr>
+        <tr><th>Articles</th><td id="s-articles">—</td></tr>
+        <tr><th>Read events</th><td id="s-reads">—</td></tr>
+        <tr><th>Read later</th><td id="s-toread">—</td></tr>
+        <tr><th>Last pull</th><td id="s-pull">—</td></tr>
+        <tr><th>Last push</th><td id="s-push">—</td></tr>
+        <tr><th>Pending changes</th><td id="s-pending">—</td></tr>
+        <tr><th>Cursor</th><td id="s-since">—</td></tr>
+      </table>
+      <div id="s-error" class="result error" style="display:none;"></div>
+      <div class="button-row">
+        <button id="sync-btn">Sync now</button>
+      </div>
+    </section>
+
+    <section class="card danger">
+      <h2>Danger zone</h2>
+      <p class="hint">
+        Throws away the local copy and downloads everything again from the server.
+        Use this if the local cache ever looks wrong. Anything not yet pushed is lost.
+      </p>
+      <div class="button-row">
+        <button id="reset-btn">Reset local cache and re-pull</button>
+      </div>
+      <div id="reset-result" class="result"></div>
+    </section>
+
+    <div class="footer">
+      <a href="../stats/stats.html">Stats</a>
+      <a href="../readlater/readlater.html">Read Later</a>
+    </div>
+  </div>
+  <script src="options.js"></script>
+</body>
+</html>

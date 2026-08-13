@@ -25,18 +25,27 @@ document.addEventListener('DOMContentLoaded', function() {
       }
       const toReadEntries = (response && response.toReadEntries) || [];
 
+      // Always refresh the summary, including when the list just became empty --
+      // otherwise removing the last item leaves stale counts on screen.
+      updateStatsSummary(toReadEntries);
+
       if (toReadEntries.length === 0) {
         entriesListElement.innerHTML = '<p>No articles in your read later list yet!</p>';
         return;
       }
 
-      // Update stats summary
-      updateStatsSummary(toReadEntries);
-
       // Initialize entries list
       updateEntriesList();
     });
   }
+
+  // A pull from another device writes straight to the cache; re-render so the page
+  // reflects what the phone did without needing a manual refresh.
+  chrome.storage.onChanged.addListener(function(changes, area) {
+    if (area === 'local' && (changes.entriesV3 || changes.readsV3)) {
+      loadToReadEntries();
+    }
+  });
   
   function updateStatsSummary(toReadEntries) {
     const totalBlogs = toReadEntries.length;
@@ -271,6 +280,15 @@ document.addEventListener('DOMContentLoaded', function() {
       });
       actionsElement.appendChild(visitBtn);
       
+      // Mark read, with an inline star picker so you can rate without leaving the page
+      const readBtn = document.createElement('button');
+      readBtn.className = 'action-btn read-btn';
+      readBtn.textContent = 'Mark read';
+      readBtn.addEventListener('click', function() {
+        toggleStarPicker(entryCard, entry, readBtn);
+      });
+      actionsElement.appendChild(readBtn);
+
       // Remove button
       const removeBtn = document.createElement('button');
       removeBtn.className = 'action-btn remove-btn';
@@ -279,51 +297,79 @@ document.addEventListener('DOMContentLoaded', function() {
         removeFromReadLater(entry.url);
       });
       actionsElement.appendChild(removeBtn);
-      
+
       entryCard.appendChild(actionsElement);
-      
+
       entriesListElement.appendChild(entryCard);
     });
   }
-  
-  function moveToReadList(entry) {
-    // Create a blog entry with rating = 0
-    const blogEntry = {
+
+  function toggleStarPicker(card, entry, btn) {
+    const open = card.querySelector('.star-picker');
+    if (open) {
+      open.remove();
+      btn.textContent = 'Mark read';
+      return;
+    }
+    btn.textContent = 'Cancel';
+
+    const picker = document.createElement('div');
+    picker.className = 'star-picker';
+
+    for (let v = 1; v <= 5; v++) {
+      const s = document.createElement('span');
+      s.className = 'picker-star';
+      s.textContent = '★';
+      s.title = `${v} star${v === 1 ? '' : 's'}`;
+      s.addEventListener('mouseover', () => {
+        picker.querySelectorAll('.picker-star').forEach((el, i) => {
+          el.classList.toggle('active', i < v);
+        });
+      });
+      s.addEventListener('click', () => moveToReadList(entry, v));
+      picker.appendChild(s);
+    }
+
+    const skip = document.createElement('button');
+    skip.className = 'action-btn';
+    skip.textContent = 'No rating';
+    skip.addEventListener('click', () => moveToReadList(entry, 0));
+    picker.appendChild(skip);
+
+    picker.addEventListener('mouseleave', () => {
+      picker.querySelectorAll('.picker-star').forEach((el) => el.classList.remove('active'));
+    });
+
+    card.appendChild(picker);
+  }
+
+  function moveToReadList(entry, rating) {
+    chrome.runtime.sendMessage({
+      action: 'markRead',
       url: entry.url,
       title: entry.title,
       author: entry.author,
       website: entry.website,
-      rating: 0,
-      date: new Date().toISOString()
-    };
-    
-    // Add to blog entries via background (single source of truth)
-    chrome.runtime.sendMessage({action: 'getBlogEntries'}, function(response) {
-      if (chrome.runtime.lastError) { console.error(chrome.runtime.lastError); return; }
-      let blogEntries = (response && response.blogEntries) || [];
-
-      const existingIndex = blogEntries.findIndex(item => item.url === blogEntry.url);
-      if (existingIndex !== -1) {
-        blogEntries[existingIndex] = blogEntry;
-      } else {
-        blogEntries.push(blogEntry);
+      rating: rating
+    }, function(response) {
+      if (chrome.runtime.lastError) {
+        console.error(chrome.runtime.lastError);
+        return;
       }
-
-      chrome.runtime.sendMessage({action: 'saveBlogEntries', blogEntries: blogEntries}, function() {
-        removeFromReadLater(entry.url);
-      });
+      if (!response || !response.success) {
+        console.error('Mark read failed:', response);
+        return;
+      }
+      // Marking it read moves it out of the queue on its own -- one row, one status.
+      loadToReadEntries();
     });
   }
 
   function removeFromReadLater(url) {
-    chrome.runtime.sendMessage({action: 'getToReadEntries'}, function(response) {
+    chrome.runtime.sendMessage({action: 'deleteEntry', url: url}, function(response) {
       if (chrome.runtime.lastError) { console.error(chrome.runtime.lastError); return; }
-      const toReadEntries = (response && response.toReadEntries) || [];
-      const newList = toReadEntries.filter(entry => entry.url !== url);
-
-      chrome.runtime.sendMessage({action: 'saveToReadEntries', toReadEntries: newList}, function() {
-        updateEntriesList();
-      });
+      if (!response || !response.success) { console.error('Remove failed:', response); return; }
+      loadToReadEntries();
     });
   }
   

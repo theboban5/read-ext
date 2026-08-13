@@ -306,3 +306,28 @@ h1 {
     width: 100%;
   }
 } 
+.star-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 0 2px;
+  width: 100%;
+}
+
+.picker-star {
+  color: #ddd;
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+  transition: color 0.1s;
+}
+
+.picker-star.active,
+.picker-star:hover {
+  color: #fbbc04;
+}
+
+.read-btn {
+  background-color: #34a853;
+  color: #fff;
+}

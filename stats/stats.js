@@ -48,6 +48,14 @@ document.addEventListener('DOMContentLoaded', function() {
         updateEntriesList();
       });
     }
+
+    // A pull from another device writes straight to the cache; re-render so what you
+    // captured on your phone appears here without a manual refresh.
+    chrome.storage.onChanged.addListener(function(changes, area) {
+      if (area === 'local' && (changes.entriesV3 || changes.readsV3)) {
+        loadBlogEntries();
+      }
+    });
     
     function createYearFilters() {
       // Get all unique years from blog entries
@@ -198,7 +206,16 @@ document.addEventListener('DOMContentLoaded', function() {
       
       // Count 5-star articles
       const fiveStarArticles = filteredEntries.filter(entry => entry.rating === 5);
-      
+
+      // "Total" counts reading sessions, so a re-read shows up twice -- same as the
+      // heatmap. Distinct articles are shown underneath when the two differ.
+      const uniqueArticles = new Set(filteredEntries.map(entry => entry.urlKey || entry.url)).size;
+      const uniqueArticlesElement = document.getElementById('unique-articles');
+      if (uniqueArticlesElement) {
+        uniqueArticlesElement.textContent =
+          uniqueArticles === totalBlogs ? '' : `${uniqueArticles} unique`;
+      }
+
       // Update DOM
       totalBlogsElement.textContent = totalBlogs;
       document.getElementById('unique-authors').textContent = uniqueAuthors.size;
@@ -797,11 +814,15 @@ document.addEventListener('DOMContentLoaded', function() {
         chrome.runtime.sendMessage({action: 'createBackup'}, function(response) {
           btn.disabled = false;
           btn.textContent = 'Create Backup';
-          
-          if (response.success) {
+
+          if (chrome.runtime.lastError) {
+            alert('Backup failed: ' + chrome.runtime.lastError.message);
+            return;
+          }
+          if (response && response.success) {
             alert('Backup created successfully! Check your Downloads folder.');
           } else {
-            alert('Backup failed: ' + response.message);
+            alert('Backup failed: ' + ((response && response.message) || 'Unknown error'));
           }
         });
       };
@@ -831,11 +852,15 @@ document.addEventListener('DOMContentLoaded', function() {
               action: 'restoreBackup',
               fileContent: fileContent
             }, function(response) {
-              if (response.success) {
-                alert('Backup restored successfully! The page will reload.');
+              if (chrome.runtime.lastError) {
+                alert('Restore failed: ' + chrome.runtime.lastError.message);
+                return;
+              }
+              if (response && response.success) {
+                alert(response.message + ' The page will reload.');
                 window.location.reload();
               } else {
-                alert('Restore failed: ' + response.message);
+                alert('Restore failed: ' + ((response && response.message) || 'Unknown error'));
               }
             });
           }

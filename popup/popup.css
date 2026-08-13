@@ -132,3 +132,16 @@ body {
   #randomizer:hover {
     text-decoration: underline;
   }
+  .notice {
+    background-color: #fef7e0;
+    border-left: 3px solid #fbbc04;
+    color: #5f4b12;
+    font-size: 12px;
+    padding: 8px 10px;
+    margin-bottom: 10px;
+    border-radius: 3px;
+  }
+
+  #open-options {
+    color: #888;
+  }

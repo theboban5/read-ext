@@ -8,6 +8,8 @@ track and rate the blogs you read
 
 no time to read an article now? add urls directly to a 'read later' list for easy access for your future self
 
+read on your phone too — see [Phone sync](#phone-sync) below
+
 ---
 
 ## Getting Started
@@ -62,7 +64,32 @@ This extension requires the following permissions:
 - **Downloads**: To create backup files
 - **Alarms**: To schedule automatic monthly backups
 
-All data is stored locally and synced across your Chrome devices.
+All data is stored locally by default. Connecting phone sync adds one more
+permission, granted at the moment you paste your worker URL — access to that host
+only.
+
+## Phone sync
+
+Reading captured on your iPhone shows up in the stats page here, and vice versa.
+
+Setup lives in [`worker/README.md`](worker/README.md): deploy a small Cloudflare
+Worker (free tier), connect the extension in its options page, and add a Shortcut to
+your iPhone share sheet. Capture on the phone is **Share → Read → tap stars → done**.
+
+Once connected:
+
+- The worker's database is the source of truth; this extension keeps a full local
+  copy, so the stats page still works offline and writes queue up until you reconnect.
+- **A re-read is its own event.** Reading something in 2025 and again in 2026 shows
+  on both heatmap days, each with its own rating. The popup says so before you save.
+- "Total" on the stats page counts reading sessions, with distinct articles shown
+  underneath when the two differ.
+- URLs are normalized, so a link shared from your phone with `?utm_source=…` is the
+  same article as the one you saved on the laptop.
+
+Migration is one-time and gated: it downloads a backup first, shows you which URLs
+would merge before uploading anything, and refuses to delete the old local data
+unless the counts match afterwards.
 
 ## Storage & Backup
 
