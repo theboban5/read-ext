@@ -271,6 +271,51 @@ export async function addToReadLater({ url, title, author, website }) {
   });
 }
 
+/**
+ * Edit an article's metadata from the stats page, and optionally the rating of one
+ * of its read events.
+ *
+ * This is the laptop-only backfill path: captures from the phone arrive with no
+ * author (the share sheet has no sensible way to ask), so they get typed in later.
+ * Fields left undefined are untouched; fields passed as '' are cleared.
+ */
+// Destructured as `key` so it does not shadow the imported urlKey() function.
+export async function updateEntry({ urlKey: key0, url, title, author, website, readId, rating }) {
+  const key = key0 || (url ? urlKey(url) : null);
+  if (!key) throw new Error('That entry has no usable URL.');
+
+  return mutate(async (ctx) => {
+    const existing = ctx.entries[key];
+    if (!existing) throw new Error('That article is no longer here.');
+
+    const fields = {};
+    if (title !== undefined) fields.title = title;
+    if (author !== undefined) fields.author = author;
+    if (website !== undefined) fields.website = website;
+
+    const row = applyEntry(
+      existing,
+      { url_key: key, url: existing.url, ...fields },
+      { now: ctx.now, mode: 'force' }
+    );
+    if (row) ctx.entries[key] = { ...row, seq: existing.seq };
+
+    const op = { url: existing.url, url_key: key, force: true, ...fields };
+
+    if (readId && rating !== undefined) {
+      const r = ctx.reads[readId];
+      if (r) {
+        const next = clampRating(rating);
+        ctx.reads[readId] = { ...r, rating: next, updated_at: ctx.now };
+        op.reads = [{ id: readId, read_at: r.read_at, rating: next, force: true }];
+      }
+    }
+
+    ctx.ops.push(op);
+    return { ok: true };
+  });
+}
+
 /** Explicit rating change on one read event -- can go down as well as up. */
 export async function setRating({ readId, rating }) {
   return mutate(async (ctx) => {

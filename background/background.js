@@ -344,6 +344,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       sync.schedulePush();
       return { success: true };
     },
+    // Laptop-only backfill: phone captures arrive with no author, so it gets typed
+    // in here afterwards.
+    updateEntry: async () => {
+      if (!(await isSynced())) return legacyUpdateEntry(request);
+      await store.updateEntry(request);
+      sync.schedulePush();
+      return { success: true };
+    },
     deleteEntry: async () => {
       const res = await writeThrough(
         () => store.deleteEntry(request.url),
@@ -511,6 +519,24 @@ async function legacyAddToReadLater({ url, title, author, website }) {
   });
   await setToReadEntries(entries);
   return { added: true };
+}
+
+// Unmigrated installs have no read events, so the edit lands on the single row for
+// that URL. Fields left undefined stay as they were.
+async function legacyUpdateEntry({ url, title, author, website, rating }) {
+  const entries = await getBlogEntries();
+  const i = entries.findIndex((e) => e.url === url);
+  if (i === -1) throw new Error('That article is no longer here.');
+
+  const e = { ...entries[i] };
+  if (title !== undefined) e.title = title;
+  if (author !== undefined) e.author = author;
+  if (website !== undefined) e.website = website;
+  if (rating !== undefined) e.rating = parseInt(rating, 10) || 0;
+  entries[i] = e;
+
+  await setBlogEntries(entries);
+  return { success: true };
 }
 
 async function legacyDelete(url) {

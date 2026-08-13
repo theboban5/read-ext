@@ -556,14 +556,122 @@ document.addEventListener('DOMContentLoaded', function() {
         infoElement.textContent = infoText;
         entryCard.appendChild(infoElement);
         
-        // Date
+        // Date, with an edit affordance alongside it
+        const footer = document.createElement('div');
+        footer.className = 'entry-footer';
+
         const dateElement = document.createElement('div');
         dateElement.className = 'entry-date';
         dateElement.textContent = formatDisplayDate(new Date(entry.date));
-        entryCard.appendChild(dateElement);
-        
+        footer.appendChild(dateElement);
+
+        // Captures from the phone have no author -- the share sheet has no sensible
+        // way to ask -- so they get filled in here.
+        const editBtn = document.createElement('button');
+        editBtn.className = 'entry-edit';
+        editBtn.textContent = entry.author ? 'Edit' : '+ author';
+        editBtn.title = 'Edit this entry';
+        editBtn.onclick = () => openEditModal(entry);
+        footer.appendChild(editBtn);
+
+        entryCard.appendChild(footer);
+
         entriesListElement.appendChild(entryCard);
       });
+    }
+
+    function openEditModal(entry) {
+      const modal = document.getElementById('edit-modal');
+      const esc = (s) => String(s == null ? '' : s)
+        .replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+      modal.innerHTML = `
+        <div class="modal-content edit-modal-content">
+          <button class="modal-close" aria-label="Close">&times;</button>
+          <h2>Edit entry</h2>
+          <p class="edit-url">${esc(entry.url)}</p>
+          <label>Title<input type="text" id="edit-title" value="${esc(entry.title)}"></label>
+          <label>Author<input type="text" id="edit-author" value="${esc(entry.author)}"
+            placeholder="e.g. Paul Graham" autocomplete="off"></label>
+          <label>Website<input type="text" id="edit-website" value="${esc(entry.website)}"></label>
+          <label>Rating</label>
+          <div class="edit-stars" id="edit-stars">
+            ${[1, 2, 3, 4, 5].map((v) =>
+              `<span class="star${v <= entry.rating ? ' active' : ''}" data-value="${v}">★</span>`
+            ).join('')}
+            <button type="button" class="edit-clear-rating" id="edit-clear-rating">clear</button>
+          </div>
+          <p class="edit-note">Edits apply to this article everywhere${
+            entry.readId ? '; the rating applies to this reading on ' +
+              formatDisplayDate(new Date(entry.date)) : ''
+          }.</p>
+          <div class="edit-actions">
+            <button id="edit-cancel">Cancel</button>
+            <button id="edit-save" class="primary">Save</button>
+          </div>
+          <p class="edit-error" id="edit-error"></p>
+        </div>
+      `;
+
+      let rating = entry.rating || 0;
+      const paint = () => {
+        modal.querySelectorAll('#edit-stars .star').forEach((s) => {
+          s.classList.toggle('active', parseInt(s.dataset.value, 10) <= rating);
+        });
+      };
+      modal.querySelectorAll('#edit-stars .star').forEach((s) => {
+        s.onclick = () => { rating = parseInt(s.dataset.value, 10); paint(); };
+      });
+      modal.querySelector('#edit-clear-rating').onclick = () => { rating = 0; paint(); };
+
+      const close = () => { modal.style.display = 'none'; };
+      modal.querySelector('.modal-close').onclick = close;
+      modal.querySelector('#edit-cancel').onclick = close;
+      modal.onclick = (e) => { if (e.target === modal) close(); };
+
+      modal.querySelector('#edit-save').onclick = function() {
+        const btn = this;
+        btn.disabled = true;
+        btn.textContent = 'Saving...';
+
+        const message = {
+          action: 'updateEntry',
+          urlKey: entry.urlKey,
+          url: entry.url,
+          title: document.getElementById('edit-title').value.trim(),
+          author: document.getElementById('edit-author').value.trim(),
+          website: document.getElementById('edit-website').value.trim()
+        };
+        // Only send a rating when we know which reading it belongs to; an article
+        // read twice has two independent ratings.
+        if (entry.readId) {
+          message.readId = entry.readId;
+          message.rating = rating;
+        }
+
+        chrome.runtime.sendMessage(message, function(response) {
+          btn.disabled = false;
+          btn.textContent = 'Save';
+
+          const err = document.getElementById('edit-error');
+          if (chrome.runtime.lastError) {
+            err.textContent = chrome.runtime.lastError.message;
+            return;
+          }
+          if (!response || !response.success) {
+            err.textContent = (response && response.message) || 'Could not save that.';
+            return;
+          }
+          close();
+          loadBlogEntries();
+        });
+      };
+
+      modal.style.display = 'flex';
+      setTimeout(() => {
+        const a = document.getElementById('edit-author');
+        if (a && !a.value) a.focus();
+      }, 50);
     }
     
     // Helper function for formatting date (YYYY-MM-DD)

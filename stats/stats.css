@@ -594,3 +594,144 @@ body {
   font-size: 12px;
   margin: 2px 0 0;
 }
+
+/* --- inline entry editing (laptop only; the phone has no way to type an author) --- */
+
+.entry-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.entry-edit {
+  background: none;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  color: #888;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  padding: 3px 10px;
+  opacity: 0;
+  transition: opacity 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.entry-card:hover .entry-edit,
+.entry-edit:focus {
+  opacity: 1;
+}
+
+.entry-edit:hover {
+  border-color: #4285f4;
+  color: #4285f4;
+}
+
+.edit-modal-content {
+  max-width: 440px;
+}
+
+.edit-modal-content h2 {
+  margin-top: 0;
+}
+
+.edit-url {
+  color: #999;
+  font-size: 12px;
+  margin: -8px 0 16px;
+  overflow-wrap: anywhere;
+}
+
+.edit-modal-content label {
+  color: #555;
+  display: block;
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
+.edit-modal-content input {
+  border: 1px solid #dadce0;
+  border-radius: 4px;
+  box-sizing: border-box;
+  display: block;
+  font-family: inherit;
+  font-size: 14px;
+  margin-top: 4px;
+  padding: 8px 10px;
+  width: 100%;
+}
+
+.edit-modal-content input:focus {
+  border-color: #4285f4;
+  outline: none;
+}
+
+.edit-stars {
+  align-items: center;
+  display: flex;
+  gap: 4px;
+  margin: 4px 0 14px;
+}
+
+.edit-stars .star {
+  color: #ddd;
+  cursor: pointer;
+  font-size: 26px;
+  line-height: 1;
+}
+
+.edit-stars .star.active {
+  color: #fbbc04;
+}
+
+.edit-clear-rating {
+  background: none;
+  border: none;
+  color: #999;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  margin-left: 8px;
+  text-decoration: underline;
+}
+
+.edit-note {
+  color: #999;
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 0 0 16px;
+}
+
+.edit-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.edit-actions button {
+  background: #fff;
+  border: 1px solid #dadce0;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 8px 16px;
+}
+
+.edit-actions button.primary {
+  background: #4285f4;
+  border-color: #4285f4;
+  color: #fff;
+}
+
+.edit-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.edit-error {
+  color: #c5221f;
+  font-size: 13px;
+  margin: 10px 0 0;
+  min-height: 18px;
+}

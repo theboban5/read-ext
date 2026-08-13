@@ -22,6 +22,29 @@ function firstWins(existing, incoming) {
   return incoming ?? null;
 }
 
+function blankToNull(v) {
+  const t = typeof v === 'string' ? v.trim() : v;
+  return t === '' || t === undefined ? null : t;
+}
+
+/**
+ * Field setter for text metadata.
+ *
+ * Normally a non-empty incoming value wins and empty never clobbers -- the phone
+ * rarely knows the author and must not blank out what you typed. But an explicit
+ * edit (mode 'force') has to be able to CLEAR a field too, so there a
+ * present-but-empty value wins.
+ *
+ * Absent (undefined) always means "leave it alone" in both modes. That is what
+ * stops /api/rate and the mobile undo path -- which send only a url_key and a
+ * status -- from wiping metadata they never carried.
+ */
+function setText(existing, incoming, mode) {
+  if (mode !== 'force') return preferNonEmpty(existing, incoming);
+  if (incoming === undefined) return existing ?? null;
+  return blankToNull(incoming);
+}
+
 /**
  * Merge an incoming entry against what is already stored.
  *
@@ -66,12 +89,13 @@ export function applyEntry(existing, incoming, ctx) {
     next.status = 'read';
   }
 
-  // The phone almost never knows the author and must not erase what you typed.
+  // url is the article's identity in display form -- never clearable, even by an
+  // explicit edit.
   next.url = preferNonEmpty(existing.url, incoming.url);
-  next.title = preferNonEmpty(existing.title, incoming.title);
-  next.author = preferNonEmpty(existing.author, incoming.author);
-  next.website = preferNonEmpty(existing.website, incoming.website);
-  next.note = preferNonEmpty(existing.note, incoming.note);
+  next.title = setText(existing.title, incoming.title, mode);
+  next.author = setText(existing.author, incoming.author, mode);
+  next.website = setText(existing.website, incoming.website, mode);
+  next.note = setText(existing.note, incoming.note, mode);
 
   // Survives the read transition, which the old moveToReadList() destroyed.
   next.saved_at = firstWins(existing.saved_at, incoming.saved_at);
