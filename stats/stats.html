@@ -34,8 +34,15 @@
     </div>
 
     <div class="activity-graph">
-      <h2>Activity</h2>
+      <div class="activity-header">
+        <h2>Activity</h2>
+        <div class="view-toggle" role="tablist">
+          <button class="view-toggle-btn active" data-view="heatmap">Heatmap</button>
+          <button class="view-toggle-btn" data-view="trends">Trends</button>
+        </div>
+      </div>
       <div id="activity-graph-container"></div>
+      <div id="trends-container" style="display:none;"></div>
     </div>
     
     <div class="entries-section">

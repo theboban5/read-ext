@@ -63,6 +63,51 @@ body {
     box-shadow: 0 2px 5px rgba(0,0,0,0.1);
   }
   
+  .activity-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 10px;
+    margin: 30px 0 20px;
+  }
+
+  .activity-header h2 {
+    border-bottom: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .view-toggle {
+    display: inline-flex;
+    background-color: #f6f8fa;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    padding: 2px;
+  }
+
+  .view-toggle-btn {
+    background: none;
+    border: none;
+    border-radius: 4px;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #57606a;
+    cursor: pointer;
+  }
+
+  .view-toggle-btn:hover {
+    color: #24292f;
+  }
+
+  .view-toggle-btn.active {
+    background-color: white;
+    color: #24292f;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.12);
+  }
+
   .year-filter-container {
     display: flex;
     gap: 8px;
@@ -107,6 +152,10 @@ body {
     display: grid;
     grid-auto-flow: column;
     grid-template-rows: 1fr;
+    /* Same pitch as the day cells (12px + 2px gap); otherwise "Nov" widens its column
+       and the labels drift right of the weeks they name. */
+    grid-auto-columns: 12px;
+    column-gap: 2px;
     margin-left: 32px;
     margin-bottom: 4px;
     font-size: 11px;
@@ -734,4 +783,223 @@ body {
   font-size: 13px;
   margin: 10px 0 0;
   min-height: 18px;
+}
+
+/* --- trends view (week over week / month over month) --- */
+
+.trend-caption {
+  color: #666;
+  font-size: 13px;
+  margin: 4px 0 10px;
+}
+
+.trend-tiles {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.trend-tile {
+  background: #fff;
+  border: 1px solid #e1e4e8;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  font-family: inherit;
+  gap: 4px;
+  min-width: 0;
+  padding: 12px 14px;
+  text-align: left;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+
+.trend-tile:hover {
+  border-color: #a8c7fa;
+}
+
+.trend-tile.active {
+  border-color: #4285f4;
+  box-shadow: 0 0 0 1px #4285f4;
+}
+
+.trend-tile-label {
+  color: #666;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.trend-tile-value {
+  color: #222;
+  font-size: 28px;
+  font-weight: bold;
+  line-height: 1.1;
+}
+
+.trend-tile-line {
+  color: #555;
+  font-size: 12px;
+}
+
+.trend-tile-line.muted {
+  color: #999;
+}
+
+.trend-delta {
+  font-weight: 600;
+}
+
+.trend-delta.up { color: #1a7f37; }
+.trend-delta.down { color: #c5221f; }
+
+.trend-chart-title {
+  color: #444;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.trend-plot {
+  height: 180px;
+  position: relative;
+  margin-top: 18px;
+}
+
+.trend-gridline {
+  border-top: 1px solid #eee;
+  left: 32px;
+  position: absolute;
+  right: 0;
+}
+
+.trend-gridline span {
+  color: #999;
+  font-size: 11px;
+  left: -32px;
+  position: absolute;
+  text-align: right;
+  transform: translateY(-50%);
+  width: 26px;
+}
+
+.trend-average {
+  border-top: 2px dashed #888;
+  left: 32px;
+  position: absolute;
+  right: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.trend-bars {
+  bottom: 0;
+  display: flex;
+  left: 32px;
+  position: absolute;
+  right: 0;
+  top: 0;
+}
+
+.trend-col {
+  align-items: center;
+  cursor: default;
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.trend-col:hover {
+  background-color: rgba(66, 133, 244, 0.06);
+}
+
+.trend-bar {
+  background-color: #4285f4;
+  border-radius: 4px 4px 0 0;
+  max-width: 32px;
+  width: 56%;
+}
+
+.trend-bar.current {
+  background: repeating-linear-gradient(135deg, #4285f4 0 4px, #8ab4f8 4px 8px);
+}
+
+.trend-bar-value {
+  color: #222;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+
+.trend-labels {
+  border-top: 1px solid #ccc;
+  display: flex;
+  margin-left: 32px;
+  padding-top: 6px;
+}
+
+.trend-labels span {
+  color: #888;
+  flex: 1 1 0;
+  font-size: 11px;
+  min-width: 0;
+  overflow: hidden;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.trend-legend {
+  align-items: center;
+  color: #777;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 12px;
+  gap: 6px;
+  margin: 14px 0 0 32px;
+}
+
+.trend-legend-avg {
+  border-top: 2px dashed #888;
+  display: inline-block;
+  width: 18px;
+}
+
+.trend-legend-current {
+  background: repeating-linear-gradient(135deg, #4285f4 0 3px, #8ab4f8 3px 6px);
+  border-radius: 2px;
+  display: inline-block;
+  height: 10px;
+  margin-left: 14px;
+  width: 10px;
+}
+
+.trend-tooltip {
+  min-width: 180px;
+  pointer-events: none;
+}
+
+.trend-tooltip-note {
+  color: #888;
+  font-weight: normal;
+}
+
+.trend-tooltip-row {
+  color: #555;
+  display: flex;
+  font-size: 13px;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 1px 0;
+}
+
+.trend-tooltip-row.selected {
+  color: #222;
+  font-weight: 600;
+}
+
+@media (max-width: 600px) {
+  .trend-tiles {
+    flex-direction: column;
+  }
 }

@@ -13,7 +13,28 @@ document.addEventListener('DOMContentLoaded', function() {
     // Store all blog entries globally
     let allBlogEntries = [];
     let selectedYear = null; // null means "last year"
-    
+
+    // Heatmap vs. trends, plus the trends view's own choices. Remembered per browser.
+    const trendsContainer = document.getElementById('trends-container');
+    let activityView = readPref('statsActivityView', 'heatmap');
+    let trendsPeriod = readPref('statsTrendsPeriod', 'week');
+    let trendsMetric = readPref('statsTrendsMetric', 'reads');
+    const TREND_PERIODS = 12;
+    const TREND_METRICS = [
+      { key: 'reads', label: 'Reads' },
+      { key: 'days', label: 'Days read' },
+      { key: 'authors', label: 'Unique authors' },
+    ];
+
+    document.querySelectorAll('.view-toggle-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        activityView = btn.dataset.view;
+        writePref('statsActivityView', activityView);
+        applyActivityView();
+      });
+    });
+    applyActivityView();
+
     // Load blog entries
     loadBlogEntries();
     
@@ -43,7 +64,8 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Create activity graph (default: last year)
         createActivityGraph(allBlogEntries, selectedYear);
-        
+        renderTrends();
+
         // Initialize entries list
         updateEntriesList();
       });
@@ -88,9 +110,10 @@ document.addEventListener('DOMContentLoaded', function() {
         yearFilterContainer.id = 'year-filter-container';
         yearFilterContainer.className = 'year-filter-container';
         
-        // Insert after the h2 heading
-        const h2 = activityGraphSection.querySelector('h2');
-        h2.insertAdjacentElement('afterend', yearFilterContainer);
+        // Insert after the heading row
+        const header = activityGraphSection.querySelector('.activity-header');
+        header.insertAdjacentElement('afterend', yearFilterContainer);
+        yearFilterContainer.style.display = activityView === 'trends' ? 'none' : '';
       }
       
       yearFilterContainer.innerHTML = '';
@@ -138,7 +161,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function updateYearFilterButtons() {
-      const buttons = document.querySelectorAll('.year-filter-btn');
+      const buttons = document.querySelectorAll('#year-filter-container .year-filter-btn');
       buttons.forEach(btn => {
         const btnYear = btn.dataset.year === '' ? null : (btn.dataset.year === 'total' ? 'total' : parseInt(btn.dataset.year));
         if (btnYear === selectedYear) {
@@ -674,6 +697,278 @@ document.addEventListener('DOMContentLoaded', function() {
       }, 50);
     }
     
+    // ---------- Trends view: week over week / month over month ----------
+
+    function applyActivityView() {
+      const isTrends = activityView === 'trends';
+      document.querySelectorAll('.view-toggle-btn').forEach(btn => {
+        const active = btn.dataset.view === activityView;
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-selected', String(active));
+      });
+      activityGraphContainer.style.display = isTrends ? 'none' : '';
+      trendsContainer.style.display = isTrends ? '' : 'none';
+      // The year buttons only drive the heatmap; trends always look back from today.
+      const yearFilterContainer = document.getElementById('year-filter-container');
+      if (yearFilterContainer) yearFilterContainer.style.display = isTrends ? 'none' : '';
+      renderTrends();
+    }
+
+    function renderTrends() {
+      if (activityView !== 'trends') return;
+      trendsContainer.innerHTML = '';
+
+      const now = new Date();
+      const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+      const currentStart = periodStart(now, trendsPeriod);
+      const unit = trendsPeriod;
+
+      // Oldest first; the last one is the period in progress.
+      const periods = [];
+      for (let i = TREND_PERIODS - 1; i >= 0; i--) {
+        const start = shiftPeriod(currentStart, trendsPeriod, -i);
+        const end = shiftPeriod(start, trendsPeriod, 1);
+        periods.push({ start, end, metrics: trendMetrics(entriesBetween(allBlogEntries, start, end)) });
+      }
+      const current = periods[periods.length - 1];
+      const previous = periods[periods.length - 2];
+
+      // The current period is only partly over, so the headline compares it with the
+      // previous one cut off at the same point (Sun-Tue vs. last Sun-Tue), not its full total.
+      const elapsedDays = Math.round((tomorrow - currentStart) / 86400000);
+      const previousCutoff = new Date(previous.start);
+      previousCutoff.setDate(previousCutoff.getDate() + elapsedDays);
+      const previousToDate = trendMetrics(entriesBetween(
+        allBlogEntries, previous.start, previousCutoff < previous.end ? previousCutoff : previous.end));
+
+      // Period switch
+      const controls = document.createElement('div');
+      controls.className = 'year-filter-container';
+      [['week', 'Week over week'], ['month', 'Month over month']].forEach(([value, label]) => {
+        const btn = document.createElement('button');
+        btn.className = 'year-filter-btn' + (value === trendsPeriod ? ' active' : '');
+        btn.textContent = label;
+        btn.addEventListener('click', function() {
+          trendsPeriod = value;
+          writePref('statsTrendsPeriod', trendsPeriod);
+          renderTrends();
+        });
+        controls.appendChild(btn);
+      });
+      trendsContainer.appendChild(controls);
+
+      // This period vs. the last one; clicking a tile charts that metric.
+      const totalDays = Math.round((current.end - current.start) / 86400000);
+      const caption = document.createElement('div');
+      caption.className = 'trend-caption';
+      caption.textContent = `This ${unit} so far · ${formatShortDate(current.start)} – ${formatShortDate(now)} ` +
+        `(day ${elapsedDays} of ${totalDays})`;
+      trendsContainer.appendChild(caption);
+
+      const tiles = document.createElement('div');
+      tiles.className = 'trend-tiles';
+      TREND_METRICS.forEach(metric => {
+        const value = current.metrics[metric.key];
+        const before = previousToDate[metric.key];
+        const diff = value - before;
+        let delta;
+        if (diff > 0) delta = `<span class="trend-delta up">▲ ${diff}</span> vs. ${before} by now last ${unit}`;
+        else if (diff < 0) delta = `<span class="trend-delta down">▼ ${-diff}</span> vs. ${before} by now last ${unit}`;
+        else delta = `<span class="trend-delta">Even</span> with ${before} by now last ${unit}`;
+
+        const tile = document.createElement('button');
+        tile.className = 'trend-tile' + (metric.key === trendsMetric ? ' active' : '');
+        tile.setAttribute('aria-pressed', String(metric.key === trendsMetric));
+        tile.innerHTML = `
+          <span class="trend-tile-label">${metric.label}</span>
+          <span class="trend-tile-value">${value}</span>
+          <span class="trend-tile-line">${delta}</span>
+          <span class="trend-tile-line muted">Last ${unit}: ${previous.metrics[metric.key]} total</span>`;
+        tile.addEventListener('click', function() {
+          trendsMetric = metric.key;
+          writePref('statsTrendsMetric', trendsMetric);
+          renderTrends();
+        });
+        tiles.appendChild(tile);
+      });
+      trendsContainer.appendChild(tiles);
+
+      trendsContainer.appendChild(buildTrendChart(periods, unit));
+    }
+
+    function buildTrendChart(periods, unit) {
+      const metric = TREND_METRICS.find(m => m.key === trendsMetric) || TREND_METRICS[0];
+      const values = periods.map(p => p.metrics[metric.key]);
+      const completed = values.slice(0, -1);
+      const average = completed.reduce((sum, v) => sum + v, 0) / completed.length;
+      const peak = Math.max(...values, average, 1);
+      const step = niceStep(peak);
+      const top = step * Math.ceil(peak / step);
+
+      const chart = document.createElement('div');
+      chart.className = 'trend-chart';
+
+      const title = document.createElement('div');
+      title.className = 'trend-chart-title';
+      title.textContent = `${metric.label} per ${unit}, last ${TREND_PERIODS} ${unit}s`;
+      chart.appendChild(title);
+
+      const plot = document.createElement('div');
+      plot.className = 'trend-plot';
+      for (let v = 0; v <= top; v += step) {
+        const line = document.createElement('div');
+        line.className = 'trend-gridline';
+        line.style.bottom = (v / top * 100) + '%';
+        line.innerHTML = `<span>${v}</span>`;
+        plot.appendChild(line);
+      }
+
+      const avgLine = document.createElement('div');
+      avgLine.className = 'trend-average';
+      avgLine.style.bottom = (average / top * 100) + '%';
+      plot.appendChild(avgLine);
+
+      const bars = document.createElement('div');
+      bars.className = 'trend-bars';
+      periods.forEach((period, i) => {
+        const isCurrent = i === periods.length - 1;
+        const col = document.createElement('div');
+        col.className = 'trend-col';
+        if (isCurrent) {
+          const label = document.createElement('span');
+          label.className = 'trend-bar-value';
+          label.textContent = values[i];
+          col.appendChild(label);
+        }
+        const bar = document.createElement('div');
+        bar.className = 'trend-bar' + (isCurrent ? ' current' : '');
+        bar.style.height = (values[i] / top * 100) + '%';
+        col.appendChild(bar);
+        attachTrendTooltip(col, period, unit, isCurrent);
+        bars.appendChild(col);
+      });
+      plot.appendChild(bars);
+      chart.appendChild(plot);
+
+      const labels = document.createElement('div');
+      labels.className = 'trend-labels';
+      periods.forEach((period, i) => {
+        const label = document.createElement('span');
+        if (unit === 'week') {
+          label.textContent = formatShortDate(period.start);
+        } else {
+          const month = period.start.toLocaleString('en-US', { month: 'short' });
+          const showYear = i === 0 || period.start.getMonth() === 0;
+          label.textContent = showYear ? `${month} '${String(period.start.getFullYear()).slice(2)}` : month;
+        }
+        labels.appendChild(label);
+      });
+      chart.appendChild(labels);
+
+      const legend = document.createElement('div');
+      legend.className = 'trend-legend';
+      legend.innerHTML = `<span class="trend-legend-avg"></span> Average of the previous ${completed.length} ${unit}s: ` +
+        `${formatAverage(average)}<span class="trend-legend-current"></span> This ${unit} (in progress)`;
+      chart.appendChild(legend);
+
+      return chart;
+    }
+
+    function attachTrendTooltip(col, period, unit, isCurrent) {
+      col.addEventListener('mouseenter', function(e) {
+        const lastDay = new Date(period.end);
+        lastDay.setDate(lastDay.getDate() - 1);
+        const heading = unit === 'week'
+          ? `${formatShortDate(period.start)} – ${formatShortDate(lastDay)}`
+          : period.start.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+        const tooltip = document.createElement('div');
+        tooltip.className = 'custom-tooltip trend-tooltip';
+        tooltip.innerHTML = `<div class='tooltip-date'>${heading}${isCurrent ? ' <span class="trend-tooltip-note">(so far)</span>' : ''}</div>` +
+          TREND_METRICS.map(m =>
+            `<div class="trend-tooltip-row${m.key === trendsMetric ? ' selected' : ''}"><span>${m.label}</span><span>${period.metrics[m.key]}</span></div>`
+          ).join('');
+        tooltip.style.left = (e.clientX + 12) + 'px';
+        tooltip.style.top = (e.clientY + 12) + 'px';
+        document.body.appendChild(tooltip);
+        col._tooltip = tooltip;
+      });
+      col.addEventListener('mousemove', function(e) {
+        if (col._tooltip) {
+          col._tooltip.style.left = (e.clientX + 12) + 'px';
+          col._tooltip.style.top = (e.clientY + 12) + 'px';
+        }
+      });
+      col.addEventListener('mouseleave', function() {
+        if (col._tooltip) col._tooltip.remove();
+        col._tooltip = null;
+      });
+    }
+
+    // Start of the week (Sunday, matching the heatmap) or month containing `date`.
+    function periodStart(date, period) {
+      const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      if (period === 'week') start.setDate(start.getDate() - start.getDay());
+      else start.setDate(1);
+      return start;
+    }
+
+    function shiftPeriod(start, period, n) {
+      const shifted = new Date(start);
+      if (period === 'week') shifted.setDate(shifted.getDate() + 7 * n);
+      else shifted.setMonth(shifted.getMonth() + n);
+      return shifted;
+    }
+
+    function entriesBetween(blogEntries, start, end) {
+      return blogEntries.filter(entry => {
+        if (!entry.date) return false;
+        const entryDate = new Date(entry.date);
+        return entryDate >= start && entryDate < end;
+      });
+    }
+
+    function trendMetrics(entries) {
+      const days = new Set();
+      const authors = new Set();
+      entries.forEach(entry => {
+        days.add(formatDate(new Date(entry.date)));
+        if (entry.author && entry.author.trim() !== '') {
+          authors.add(entry.author.trim().toLowerCase());
+        }
+      });
+      return { reads: entries.length, days: days.size, authors: authors.size };
+    }
+
+    // Smallest round gridline step that keeps the axis to four lines or fewer.
+    function niceStep(max) {
+      const steps = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000];
+      return steps.find(s => max / s <= 4) || Math.ceil(max / 4);
+    }
+
+    function formatAverage(n) {
+      return Number.isInteger(n) ? String(n) : n.toFixed(1);
+    }
+
+    function formatShortDate(date) {
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+
+    function readPref(key, fallback) {
+      try {
+        return localStorage.getItem(key) || fallback;
+      } catch (err) {
+        return fallback;
+      }
+    }
+
+    function writePref(key, value) {
+      try {
+        localStorage.setItem(key, value);
+      } catch (err) {
+        // Not remembering the choice is fine.
+      }
+    }
+
     // Helper function for formatting date (YYYY-MM-DD)
     function formatDate(date) {
       const year = date.getFullYear();
