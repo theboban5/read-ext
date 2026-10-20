@@ -21,12 +21,22 @@ document.addEventListener('DOMContentLoaded', function() {
     let trendsMetric = readPref('statsTrendsMetric', 'reads');
     const TREND_PERIODS = 12;
     const TREND_METRICS = [
-      { key: 'reads', label: 'Reads' },
-      { key: 'days', label: 'Days read' },
-      { key: 'authors', label: 'Unique authors' },
+      { key: 'reads', label: 'Reads', noun: 'reads' },
+      { key: 'days', label: 'Days read', noun: 'days read' },
+      { key: 'authors', label: 'Unique authors', noun: 'unique authors' },
     ];
+    // How far back the chart goes: a number of periods, or every one since the first read.
+    const TREND_RANGES = {
+      week: [['12', '12 wks'], ['26', '26 wks'], ['52', '52 wks'], ['all', 'All']],
+      month: [['12', '12 mo'], ['24', '24 mo'], ['all', 'All']],
+    };
+    const TREND_MIN_COLUMN = 10; // px per bar before the chart scrolls sideways
+    const trendsRange = {
+      week: readPref('statsTrendsRangeWeek', '12'),
+      month: readPref('statsTrendsRangeMonth', '12'),
+    };
 
-    document.querySelectorAll('.view-toggle-btn').forEach(btn => {
+    document.querySelectorAll('.activity-header .view-toggle-btn').forEach(btn => {
       btn.addEventListener('click', function() {
         activityView = btn.dataset.view;
         writePref('statsActivityView', activityView);
@@ -701,7 +711,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function applyActivityView() {
       const isTrends = activityView === 'trends';
-      document.querySelectorAll('.view-toggle-btn').forEach(btn => {
+      document.querySelectorAll('.activity-header .view-toggle-btn').forEach(btn => {
         const active = btn.dataset.view === activityView;
         btn.classList.toggle('active', active);
         btn.setAttribute('aria-selected', String(active));
@@ -720,30 +730,23 @@ document.addEventListener('DOMContentLoaded', function() {
 
       const now = new Date();
       const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-      const currentStart = periodStart(now, trendsPeriod);
       const unit = trendsPeriod;
-
-      // Oldest first; the last one is the period in progress.
-      const periods = [];
-      for (let i = TREND_PERIODS - 1; i >= 0; i--) {
-        const start = shiftPeriod(currentStart, trendsPeriod, -i);
-        const end = shiftPeriod(start, trendsPeriod, 1);
-        periods.push({ start, end, metrics: trendMetrics(entriesBetween(allBlogEntries, start, end)) });
-      }
-      const current = periods[periods.length - 1];
-      const previous = periods[periods.length - 2];
+      const allPeriods = buildPeriods(unit, periodStart(now, unit));
+      const current = allPeriods[allPeriods.length - 1];
+      const previous = allPeriods[allPeriods.length - 2];
 
       // The current period is only partly over, so the headline compares it with the
       // previous one cut off at the same point (Sun-Tue vs. last Sun-Tue), not its full total.
-      const elapsedDays = Math.round((tomorrow - currentStart) / 86400000);
+      const elapsedDays = Math.round((tomorrow - current.start) / 86400000);
       const previousCutoff = new Date(previous.start);
       previousCutoff.setDate(previousCutoff.getDate() + elapsedDays);
-      const previousToDate = trendMetrics(entriesBetween(
-        allBlogEntries, previous.start, previousCutoff < previous.end ? previousCutoff : previous.end));
+      const previousToDate = trendMetrics(previous.entries.filter(entry => new Date(entry.date) < previousCutoff));
 
-      // Period switch
+      // Period switch on the left, how far back to chart on the right
       const controls = document.createElement('div');
-      controls.className = 'year-filter-container';
+      controls.className = 'trend-controls';
+      const periodButtons = document.createElement('div');
+      periodButtons.className = 'year-filter-container';
       [['week', 'Week over week'], ['month', 'Month over month']].forEach(([value, label]) => {
         const btn = document.createElement('button');
         btn.className = 'year-filter-btn' + (value === trendsPeriod ? ' active' : '');
@@ -753,8 +756,25 @@ document.addEventListener('DOMContentLoaded', function() {
           writePref('statsTrendsPeriod', trendsPeriod);
           renderTrends();
         });
-        controls.appendChild(btn);
+        periodButtons.appendChild(btn);
       });
+      controls.appendChild(periodButtons);
+
+      const range = selectedRange();
+      const rangeToggle = document.createElement('div');
+      rangeToggle.className = 'view-toggle';
+      TREND_RANGES[unit].forEach(([value, label]) => {
+        const btn = document.createElement('button');
+        btn.className = 'view-toggle-btn' + (value === range ? ' active' : '');
+        btn.textContent = label;
+        btn.addEventListener('click', function() {
+          trendsRange[unit] = value;
+          writePref(unit === 'week' ? 'statsTrendsRangeWeek' : 'statsTrendsRangeMonth', value);
+          renderTrends();
+        });
+        rangeToggle.appendChild(btn);
+      });
+      controls.appendChild(rangeToggle);
       trendsContainer.appendChild(controls);
 
       // This period vs. the last one; clicking a tile charts that metric.
@@ -791,27 +811,109 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         tiles.appendChild(tile);
       });
+      tiles.appendChild(buildTopTile(allPeriods, unit));
       trendsContainer.appendChild(tiles);
 
-      trendsContainer.appendChild(buildTrendChart(periods, unit));
+      const shown = range === 'all' ? allPeriods : allPeriods.slice(-Number(range));
+      trendsContainer.appendChild(buildTrendChart(allPeriods, shown, unit, range));
+
+      // Long ranges scroll sideways; start at the present.
+      const scroller = trendsContainer.querySelector('.trend-scroll');
+      scroller.scrollLeft = scroller.scrollWidth;
+      if (scroller.scrollWidth > scroller.clientWidth) {
+        trendsContainer.querySelector('.trend-legend-hint').textContent =
+          `Click a bar to see its reads · scroll left for earlier ${unit}s`;
+      }
     }
 
-    function buildTrendChart(periods, unit) {
-      const metric = TREND_METRICS.find(m => m.key === trendsMetric) || TREND_METRICS[0];
+    // Every week/month from the first read (or at least TREND_PERIODS back) through the
+    // current one, oldest first, each holding its reads. The last one is in progress.
+    function buildPeriods(unit, currentStart) {
+      const buckets = new Map();
+      let earliest = shiftPeriod(currentStart, unit, -(TREND_PERIODS - 1));
+      allBlogEntries.forEach(entry => {
+        if (!entry.date) return;
+        const entryDate = new Date(entry.date);
+        if (isNaN(entryDate)) return;
+        const start = periodStart(entryDate, unit);
+        if (start > currentStart) return;
+        if (start < earliest) earliest = start;
+        const key = start.getTime();
+        if (!buckets.has(key)) buckets.set(key, []);
+        buckets.get(key).push(entry);
+      });
+
+      const periods = [];
+      for (let start = earliest; start <= currentStart; start = shiftPeriod(start, unit, 1)) {
+        const entries = buckets.get(start.getTime()) || [];
+        periods.push({ start, end: shiftPeriod(start, unit, 1), entries, metrics: trendMetrics(entries) });
+      }
+      return periods;
+    }
+
+    function selectedMetric() {
+      return TREND_METRICS.find(m => m.key === trendsMetric) || TREND_METRICS[0];
+    }
+
+    function selectedRange() {
+      const range = trendsRange[trendsPeriod];
+      return TREND_RANGES[trendsPeriod].some(([value]) => value === range) ? range : '12';
+    }
+
+    // The best week/month ever for the charted metric (the earliest one on a tie).
+    function buildTopTile(periods, unit) {
+      const metric = selectedMetric();
+      let topIndex = 0;
+      periods.forEach((period, i) => {
+        if (period.metrics[metric.key] > periods[topIndex].metrics[metric.key]) topIndex = i;
+      });
+      const top = periods[topIndex];
+      const isCurrent = topIndex === periods.length - 1;
+
+      const tile = document.createElement('button');
+      tile.className = 'trend-tile trend-tile-top';
+      tile.title = `See the reads from that ${unit}`;
+      tile.innerHTML = `
+        <span class="trend-tile-label">Top ${unit}</span>
+        <span class="trend-tile-value">${top.metrics[metric.key]}</span>
+        <span class="trend-tile-line">${formatPeriod(top, unit)}${isCurrent ? ` · this ${unit}!` : ''}</span>
+        <span class="trend-tile-line muted">Most ${metric.noun} in any ${unit} · see reads ›</span>`;
+      tile.addEventListener('click', () => openPeriodModal(periods, topIndex, unit));
+      return tile;
+    }
+
+    function buildTrendChart(allPeriods, periods, unit, range) {
+      const metric = selectedMetric();
       const values = periods.map(p => p.metrics[metric.key]);
       const completed = values.slice(0, -1);
-      const average = completed.reduce((sum, v) => sum + v, 0) / completed.length;
+      const average = completed.length ? completed.reduce((sum, v) => sum + v, 0) / completed.length : 0;
       const peak = Math.max(...values, average, 1);
       const step = niceStep(peak);
       const top = step * Math.ceil(peak / step);
+      // Past this many bars the per-bar labels collide, so label month/year boundaries instead.
+      const dense = periods.length > (unit === 'week' ? 13 : 24);
+      // Index of periods[0] within allPeriods, so the pop-up can page through everything.
+      const offset = allPeriods.length - periods.length;
 
       const chart = document.createElement('div');
-      chart.className = 'trend-chart';
+      chart.className = 'trend-chart' + (dense ? ' dense' : '');
 
       const title = document.createElement('div');
       title.className = 'trend-chart-title';
-      title.textContent = `${metric.label} per ${unit}, last ${TREND_PERIODS} ${unit}s`;
+      title.textContent = `${metric.label} per ${unit}, ` +
+        (range === 'all' ? `all time (${periods.length} ${unit}s)` : `last ${periods.length} ${unit}s`);
       chart.appendChild(title);
+
+      // The y-axis stays put while the bars scroll sideways on long ranges.
+      const body = document.createElement('div');
+      body.className = 'trend-body';
+      const yAxis = document.createElement('div');
+      yAxis.className = 'trend-yaxis';
+      const scroller = document.createElement('div');
+      scroller.className = 'trend-scroll';
+      const canvas = document.createElement('div');
+      canvas.className = 'trend-canvas';
+      canvas.style.minWidth = (periods.length * TREND_MIN_COLUMN) + 'px';
 
       const plot = document.createElement('div');
       plot.className = 'trend-plot';
@@ -819,8 +921,11 @@ document.addEventListener('DOMContentLoaded', function() {
         const line = document.createElement('div');
         line.className = 'trend-gridline';
         line.style.bottom = (v / top * 100) + '%';
-        line.innerHTML = `<span>${v}</span>`;
         plot.appendChild(line);
+        const tick = document.createElement('span');
+        tick.style.bottom = (v / top * 100) + '%';
+        tick.textContent = v;
+        yAxis.appendChild(tick);
       }
 
       const avgLine = document.createElement('div');
@@ -845,48 +950,79 @@ document.addEventListener('DOMContentLoaded', function() {
         bar.style.height = (values[i] / top * 100) + '%';
         col.appendChild(bar);
         attachTrendTooltip(col, period, unit, isCurrent);
+        col.addEventListener('click', function() {
+          if (col._tooltip) col._tooltip.remove();
+          col._tooltip = null;
+          openPeriodModal(allPeriods, offset + i, unit);
+        });
         bars.appendChild(col);
       });
       plot.appendChild(bars);
-      chart.appendChild(plot);
+      canvas.appendChild(plot);
 
       const labels = document.createElement('div');
       labels.className = 'trend-labels';
       periods.forEach((period, i) => {
         const label = document.createElement('span');
-        if (unit === 'week') {
-          label.textContent = formatShortDate(period.start);
-        } else {
-          const month = period.start.toLocaleString('en-US', { month: 'short' });
-          const showYear = i === 0 || period.start.getMonth() === 0;
-          label.textContent = showYear ? `${month} '${String(period.start.getFullYear()).slice(2)}` : month;
-        }
+        label.textContent = periodAxisLabel(period, unit, i, dense);
         labels.appendChild(label);
       });
-      chart.appendChild(labels);
+      canvas.appendChild(labels);
+
+      scroller.appendChild(canvas);
+      body.appendChild(yAxis);
+      body.appendChild(scroller);
+      chart.appendChild(body);
 
       const legend = document.createElement('div');
       legend.className = 'trend-legend';
       legend.innerHTML = `<span class="trend-legend-avg"></span> Average of the previous ${completed.length} ${unit}s: ` +
-        `${formatAverage(average)}<span class="trend-legend-current"></span> This ${unit} (in progress)`;
+        `${formatAverage(average)}<span class="trend-legend-current"></span> This ${unit} (in progress)` +
+        `<span class="trend-legend-hint">Click a bar to see its reads</span>`;
       chart.appendChild(legend);
 
       return chart;
     }
 
-    function attachTrendTooltip(col, period, unit, isCurrent) {
-      col.addEventListener('mouseenter', function(e) {
+    function periodAxisLabel(period, unit, index, dense) {
+      const shortYear = date => `'${String(date.getFullYear()).slice(2)}`;
+      const monthName = date => date.toLocaleString('en-US', { month: 'short' });
+      if (unit === 'week') {
+        if (!dense) return formatShortDate(period.start);
+        // Name the month on the week its 1st falls in.
         const lastDay = new Date(period.end);
         lastDay.setDate(lastDay.getDate() - 1);
-        const heading = unit === 'week'
-          ? `${formatShortDate(period.start)} – ${formatShortDate(lastDay)}`
-          : period.start.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+        if (period.start.getDate() !== 1 && lastDay.getMonth() === period.start.getMonth()) return '';
+        return lastDay.getMonth() === 0 ? `${monthName(lastDay)} ${shortYear(lastDay)}` : monthName(lastDay);
+      }
+      const month = period.start.getMonth();
+      if (dense) {
+        if (month === 0) return String(period.start.getFullYear());
+        return month % 3 === 0 ? monthName(period.start) : '';
+      }
+      return index === 0 || month === 0 ? `${monthName(period.start)} ${shortYear(period.start)}` : monthName(period.start);
+    }
+
+    // "Oct 11 – Oct 17" (with the year when it isn't this one) or "October 2026".
+    function formatPeriod(period, unit) {
+      if (unit === 'month') {
+        return period.start.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+      }
+      const lastDay = new Date(period.end);
+      lastDay.setDate(lastDay.getDate() - 1);
+      const year = lastDay.getFullYear() === new Date().getFullYear() ? '' : `, ${lastDay.getFullYear()}`;
+      return `${formatShortDate(period.start)} – ${formatShortDate(lastDay)}${year}`;
+    }
+
+    function attachTrendTooltip(col, period, unit, isCurrent) {
+      col.addEventListener('mouseenter', function(e) {
         const tooltip = document.createElement('div');
         tooltip.className = 'custom-tooltip trend-tooltip';
-        tooltip.innerHTML = `<div class='tooltip-date'>${heading}${isCurrent ? ' <span class="trend-tooltip-note">(so far)</span>' : ''}</div>` +
+        tooltip.innerHTML = `<div class='tooltip-date'>${formatPeriod(period, unit)}${isCurrent ? ' <span class="trend-tooltip-note">(so far)</span>' : ''}</div>` +
           TREND_METRICS.map(m =>
             `<div class="trend-tooltip-row${m.key === trendsMetric ? ' selected' : ''}"><span>${m.label}</span><span>${period.metrics[m.key]}</span></div>`
-          ).join('');
+          ).join('') +
+          (period.entries.length ? `<div class="trend-tooltip-hint">Click to see the reads</div>` : '');
         tooltip.style.left = (e.clientX + 12) + 'px';
         tooltip.style.top = (e.clientY + 12) + 'px';
         document.body.appendChild(tooltip);
@@ -904,6 +1040,86 @@ document.addEventListener('DOMContentLoaded', function() {
       });
     }
 
+    // Everything read in one week/month, newest first and grouped by day, with
+    // prev/next to page through neighbouring periods.
+    function openPeriodModal(periods, index, unit) {
+      const period = periods[index];
+      const isCurrent = index === periods.length - 1;
+      const m = period.metrics;
+      const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+      const modal = document.getElementById('period-modal');
+      modal.innerHTML = `
+        <div class="modal-content period-modal-content">
+          <button class="modal-close" aria-label="Close">&times;</button>
+          <h2>${formatPeriod(period, unit)}</h2>
+          <div class="period-meta">
+            <span>${plural(m.reads, 'read')} · ${plural(m.days, 'day')} read · ${plural(m.authors, 'author')}${isCurrent ? ' · so far' : ''}</span>
+            <span class="period-nav">
+              <button data-step="-1" ${index === 0 ? 'disabled' : ''}>‹ Prev ${unit}</button>
+              <button data-step="1" ${isCurrent ? 'disabled' : ''}>Next ${unit} ›</button>
+            </span>
+          </div>
+          <div class="period-list"></div>
+        </div>
+      `;
+
+      const list = modal.querySelector('.period-list');
+      if (period.entries.length === 0) {
+        list.innerHTML = `<p class="period-empty">Nothing read this ${unit}.</p>`;
+      }
+      const sorted = period.entries.slice().sort((a, b) => new Date(b.date) - new Date(a.date));
+      const perDay = new Map();
+      sorted.forEach(entry => {
+        const key = formatDate(new Date(entry.date));
+        perDay.set(key, (perDay.get(key) || 0) + 1);
+      });
+      let lastDay = null;
+      sorted.forEach(entry => {
+        const entryDate = new Date(entry.date);
+        const dayKey = formatDate(entryDate);
+        if (dayKey !== lastDay) {
+          lastDay = dayKey;
+          const heading = document.createElement('div');
+          heading.className = 'period-day';
+          heading.textContent = entryDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }) + ' ';
+          const count = document.createElement('span');
+          count.textContent = `(${perDay.get(dayKey)})`;
+          heading.appendChild(count);
+          list.appendChild(heading);
+        }
+
+        const row = document.createElement('div');
+        row.className = 'five-star-entry period-entry';
+        const link = document.createElement('a');
+        link.className = 'five-star-title';
+        link.href = entry.url || '#';
+        link.target = '_blank';
+        link.rel = 'noopener';
+        link.textContent = entry.title || 'Untitled';
+        row.appendChild(link);
+        const info = document.createElement('div');
+        info.className = 'five-star-info';
+        info.textContent = [entry.author ? `by ${entry.author}` : '', entry.website ? `on ${entry.website}` : '']
+          .filter(Boolean).join(' ');
+        if (entry.rating) {
+          const stars = document.createElement('span');
+          stars.className = 'period-rating';
+          stars.textContent = '★'.repeat(entry.rating) + '☆'.repeat(5 - entry.rating);
+          info.appendChild(stars);
+        }
+        row.appendChild(info);
+        list.appendChild(row);
+      });
+
+      modal.querySelectorAll('.period-nav button').forEach(btn => {
+        btn.onclick = () => openPeriodModal(periods, index + Number(btn.dataset.step), unit);
+      });
+      modal.querySelector('.modal-close').onclick = () => { modal.style.display = 'none'; };
+      modal.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
+      modal.style.display = 'flex';
+    }
+
     // Start of the week (Sunday, matching the heatmap) or month containing `date`.
     function periodStart(date, period) {
       const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -917,14 +1133,6 @@ document.addEventListener('DOMContentLoaded', function() {
       if (period === 'week') shifted.setDate(shifted.getDate() + 7 * n);
       else shifted.setMonth(shifted.getMonth() + n);
       return shifted;
-    }
-
-    function entriesBetween(blogEntries, start, end) {
-      return blogEntries.filter(entry => {
-        if (!entry.date) return false;
-        const entryDate = new Date(entry.date);
-        return entryDate >= start && entryDate < end;
-      });
     }
 
     function trendMetrics(entries) {
